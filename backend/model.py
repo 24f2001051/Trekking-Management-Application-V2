@@ -44,8 +44,8 @@ class Trek(db.Model):                   ## Trek Model ##
     location = db.Column(db.String(), nullable=False)
     description = db.Column(db.String(), nullable=False)
     assign_staff_id = db.Column(db.Integer(), db.ForeignKey(User.id))
-    status = db.Column(db.String(), nullable=False)    #(Booked/Completed/Cancelled)
-    # relationship
+    status = db.Column(db.String(), nullable=False, default='Inactive')    #(Active, Inactive)
+    # relationship                                     
     bookings = db.relationship('Booking', back_populates='trek', cascade='all, delete-orphan')
     assigned_staff = db.relationship('User', back_populates='assigned_treks', foreign_keys=[assign_staff_id])
 

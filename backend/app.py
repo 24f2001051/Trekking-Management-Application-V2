@@ -6,12 +6,12 @@ from flask_cors import CORS
 
 from database import db
 from model import User, Role, UserRoles, Trek, Booking, Availability, Trekker_info, Staff_info
-# from .config import Config
+from config import Config
 from user_datastore import user_datastore
 
 def create_app():
     app = Flask(__name__)
-    # app.config.from_object(Config)
+    app.config.from_object(Config)
     
     db.init_app(app)
     
@@ -34,24 +34,24 @@ class Index(Resource):
     def get(self):
         return {'message': 'Hello, World!'}
 
-# from .apis import LoginAPI, LogoutAPI, RegisterAPI
-# from .apis import AddStaffAPI, AdminDashboardAPI, AdminDashboardTreksAPI, AddTrekAPI
-# from .apis import  StaffDashboardAPI, TrekkerDashboardAPI, AddTrekAPI
+from apis import LoginAPI, LogoutAPI, RegisterAPI
+from apis import AddStaffAPI, AdminDashboardAPI, AdminDashboardTreksAPI, AddTrekAPI
+from apis import  StaffDashboardAPI, TrekkerDashboardAPI, AddTrekAPI
 
 
 
 # api.add_resource(Index, '/')
-# api.add_resource(LoginAPI, '/login')
-# api.add_resource(LogoutAPI, '/logout')
-# api.add_resource(RegisterAPI, '/register')
+api.add_resource(LoginAPI, '/login')
+api.add_resource(LogoutAPI, '/logout')
+api.add_resource(RegisterAPI, '/register')
 
-# api.add_resource(AdminDashboardAPI, '/admin_dashboard') #Admin dashboard
-# api.add_resource(AdminDashboardTreksAPI, '/admin_dashboard/treks')
-# api.add_resource(AddTrekAPI, '/admin_dashboard/treks/add_trek')
-# api.add_resource(AddStaffAPI, '/admin_dashboard/add_staff')
+api.add_resource(AdminDashboardAPI, '/admin_dashboard') #Admin dashboard
+api.add_resource(AdminDashboardTreksAPI, '/admin_dashboard/treks')
+api.add_resource(AddTrekAPI, '/admin_dashboard/treks/add_trek')
+api.add_resource(AddStaffAPI, '/admin_dashboard/staff/add_staff')
 
-# api.add_resource(StaffDashboardAPI, '/staff_dashboard')
-# api.add_resource(TrekkerDashboardAPI, '/trekker_dashboard')
+api.add_resource(StaffDashboardAPI, '/staff_dashboard')
+api.add_resource(TrekkerDashboardAPI, '/trekker_dashboard')
 
 
 if __name__ == '__main__':
