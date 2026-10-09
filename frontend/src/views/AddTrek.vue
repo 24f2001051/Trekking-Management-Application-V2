@@ -1,103 +1,142 @@
 <template>
-<DashNavbar />
-    <div class="container-fluid">
-        <div class="row justify-content-center">
+    <DashNavbar />
+
+    <div class="d-flex">
+        <AdminSidebar />
+
+        <main class="flex-grow-1 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Add a Trek</h1>
+            </div>
+
             <div class="form-body col-6">                     <!-- form-body -->
-                <br>
-                <h3 class= "text-center">Add a Trek</h3>
     
-                <form v-on:submit.prevent="saveTrek">
+                <form v-on:submit.prevent="add_trek">
                     <div class="mb-3">
-                        <label for="InputTrekname" class="form-label">Trek Name:</label>
-                        <input type="text" class="form-control" id="InputTrekname" placeholder="input trek name here" required v-model="trekname" @input="validateTrekname">
+                        <label for="Inputtrekname" class="form-label">Trek Name:</label>
+                        <input type="text" class="form-control" id="Inputtrekname" placeholder="input trek name here"  v-model="trekname" @input="validateTrekname">
                         <div class="text-danger">{{ treknameError }}</div>
                     </div>
                     <div class="mb-3">
-                        <label for="InputUsername" class="form-label">Username:</label>
-                        <input type="text" class="form-control" id="InputUsername" placeholder="input username here" required v-model="username" @input="validateUsername">
-                        <div class="text-danger">{{ usernameError }}</div>
+                        <label for="InputLocation" class="form-label">Location:</label>
+                        <input type="text" class="form-control" id="InputLocation" placeholder="input location here" v-model="location" @input="validateLocation">
+                        <div class="text-danger">{{ locationError }}</div>
                     </div>
                     <div class="mb-3">
-                        <label for="InputEmail" class="form-label">Email:</label>
-                        <input type="email" class="form-control" id="InputEmail" placeholder="input email here" required v-model="email" @input="validateEmail">
-                        <div class="text-danger">{{ emailError }}</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="InputPassword" class="form-label">Password:</label>
-                        <input type="password" class="form-control" id="InputPassword" placeholder="and password here" required v-model="password" @input="validatePassword">
-                        <div class="text-danger">{{ passwordError }}</div>
+                        <label for="InputDifficulty" class="form-label">Difficulty:</label>
+                        <select id="InputDifficulty" class="form-select" placeholder="Choose Difficulty" v-model="difficulty" @change="validateDifficulty">                             
+                                                    
+                            <option value="" disabled selected >Choose Difficulty</option>
+                            <option value="Explorer">Explorer(Beginner)</option>
+                            <option value="Adventurer">Adventurer(Intermediate)</option>
+                            <option value="Trialblazer">Trialblazer(Advanced)</option>
+                                                              
+                        </select>
+                        <div class="text-danger">{{ difficultyError }}</div>
                     </div>
 
+                    <div class="mb-3">
+                        <label for="InputDuration" class="form-label">Duration:</label>
+                        <input type="number" class="form-control" id="InputDuration" placeholder="duration here" v-model="duration" @input="validateDuration">
+                        <div class="text-danger">{{ durationError }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="InputDescription" class="form-label">Description:</label>
+                        <textarea type="text" class="form-control" id="InputDescription" placeholder="write a brief description here" v-model="description" @input="validateDescription"></textarea>
+                        <div class="text-danger">{{ descriptionError }}</div>
+                    </div>
+
+
+                    
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <button type="button" class="btn btn-primary fw-bold" @click="router.push('/admin_dashboard/treks')">Back</button>
-                        <input type="submit" class="btn btn-success fw-bold" value="Save">    
+                        <input type="submit" class="btn btn-success fw-bold" value="Create A Trek">    
                     </div>
                 </form>
             </div>
-        </div>
+
+            
+        </main>
     </div>
 
-    </template>
-    
+</template>
+
+
+
 <script setup>
-    import PublicNavbar from '../components/PublicNavbar.vue'
-    import { useRouter } from 'vue-router'; // 1. Import it
-    const router = useRouter(); // 2. Define it
+import { ref, computed, onMounted } from "vue";
+import DashNavbar from '@/components/DashNavbar.vue'
+import AdminSidebar from '@/components/AdminSidebar.vue';
+import { useRouter } from 'vue-router'; // 1. Import it
+const router = useRouter(); // 2. Define it
 
-    import { ref } from 'vue';
-import DashNavbar from '@/components/DashNavbar.vue';
 
-    const fullname = ref('');
-    const username = ref('');
-    const email = ref('');
-    const password = ref('');
 
-    const fullnameError = ref('');
-    const usernameError = ref('');
-    const emailError = ref('');
-    const passwordError = ref('');
+const trekname = ref('');
+const location = ref('');
+const difficulty = ref('');
+const duration = ref('');
+const description = ref('');
+
+const treknameError = ref('');
+const locationError = ref('');
+const difficultyError = ref('');
+const durationError = ref('');
+const descriptionError = ref('');
 
     // validation
-    const validatePassword = () => {
-        if (password.value.length < 1){
-            passwordError.value = 'Password cannot be empty!';
-            return false;
-        } else {
-            passwordError.value = '';
-            return true;
-        } ;
-    }
-    const validateUsername = () => {
-        if (username.value.length < 1){
-            usernameError.value = 'Please enter the Username!';
-            return false;
-        } else {
-            usernameError.value = '';
-            return true;
-        } ;
-    }
-    const validateEmail = () => {
-        if (email.value.length < 1){
-            emailError.value = 'Please enter the Email!';
-            return false;
-        } else {
-            emailError.value = '';
-            return true;
-        } ;
-    }
-    const validateFullname = () => {
-        if (fullname.value.length < 1){
-            fullnameError.value = 'Full name cannot be empty!';
-            return false;
-        } else {
-            fullnameError.value = '';
-            return true;
-        } ;
-    }
 
-    async function register() {
+    const validateTrekname = () => {
+        if (trekname.value.length < 1){
+            treknameError.value = 'Trek name cannot be empty!';
+            return false;
+        } else {
+            treknameError.value = '';
+            return true;
+        } ;
+    }
+    const validateLocation = () => {
+        if (location.value.length < 1){
+            locationError.value = 'Please enter the Location!';
+            return false;
+        } else {
+            locationError.value = '';
+            return true;
+        } ;
+    }
+    const validateDifficulty = () => {
+        if (difficulty.value.length < 1){
+            difficultyError.value = 'Choose the difficulty!';
+            return false;
+        } else {
+            difficultyError.value = '';
+            return true;
+        } ;
+    }
+    const validateDuration = () => {
+        if (duration.value === null || duration.value === undefined || duration.value.toString().length < 1){
+            durationError.value = 'Mention the duration!';
+            return false;
+        } else {
+            durationError.value = '';
+            return true;
+        } ;
+    }
+    const validateDescription = () => {
+        if (description.value.length < 1){
+            descriptionError.value = 'Give a breif discription!';
+            return false;
+        } else {
+            descriptionError.value = '';
+            return true;
+        } ;
+    }
+    
 
-        if (username.value === '' || password.value === '' || email.value === '' || fullname.value === '') {
+    async function add_trek() {
+
+        if (trekname.value === '' || location.value === '' || difficulty.value === '' || duration.value === '' || description.value === '') {
             alert('Please fill all the fields');
             return;
         }
@@ -110,10 +149,12 @@ import DashNavbar from '@/components/DashNavbar.vue';
                 'Authentication-Token': token
             },
             body: JSON.stringify({
-                fullname: fullname.value,
-                username: username.value,
-                email: email.value,
-                password: password.value
+                trek_name: trekname.value,
+                location: location.value,
+                difficulty: difficulty.value,
+                duration: duration.value,
+                description: description.value,
+
             })
         });
 
@@ -122,16 +163,18 @@ import DashNavbar from '@/components/DashNavbar.vue';
             if (!response.ok) {
                 const errorData = await response.json();
                 console.error(errorData);
-                alert(`Registration failed: ${errorData.message}`);
+                alert(`Adding a Trek failed: ${errorData.message}`);
                 return;
             } else {
                 const data = await response.json();
                 console.log(data);
         
-                router.push('/login');
+                router.push('/admin_dashboard/treks');
                 return;
             }
         
     }
 
 </script>
+
+

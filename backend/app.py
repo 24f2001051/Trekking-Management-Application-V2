@@ -27,7 +27,31 @@ def create_app():
     return app, api
 
 app, api = create_app()
-CORS(app , origins=['http://localhost:5173', 'http://127.0.0.1:5000'])
+
+CORS(
+app,
+resources={
+r"/api/*": {
+"origins": [
+"http://localhost:5173",
+"http://127.0.0.1:5173"
+]
+}
+},
+allow_headers=[
+"Content-Type",
+"Authentication-Token",
+"Authorization"
+],
+methods=[
+"GET",
+"POST",
+"PUT",
+"PATCH",
+"DELETE",
+"OPTIONS"
+]
+)
 
 
 class Index(Resource):
@@ -35,7 +59,9 @@ class Index(Resource):
         return {'message': 'Hello, World!'}
 
 from apis import LoginAPI, LogoutAPI, RegisterAPI
-from apis import AddStaffAPI, AdminDashboardAPI, AdminDashboardTreksAPI, AddTrekAPI
+from apis import AdminDashboardAPI, AdminDashboardTreksAPI, AdminDashboardStaffAPI, AdminDashboardUsersAPI, AdminDashboardBookingsAPI, AdminDashboardReportsAPI
+from apis import AddStaffAPI, AddTrekAPI, EditDeleteTrekAPI, AssignTrekToStaffAPI,AdminDeleteUserAPI ,AdminStaffOptionsAPI, AdminStaffStatusAPI , AdminUserStatusAPI
+
 from apis import  StaffDashboardAPI, TrekkerDashboardAPI, AddTrekAPI
 
 
@@ -47,8 +73,20 @@ api.add_resource(RegisterAPI, '/register')
 
 api.add_resource(AdminDashboardAPI, '/admin_dashboard') #Admin dashboard
 api.add_resource(AdminDashboardTreksAPI, '/admin_dashboard/treks')
+api.add_resource(AdminDashboardStaffAPI, '/admin_dashboard/staff')
+api.add_resource(AdminDashboardUsersAPI, '/admin_dashboard/users')
+api.add_resource(AdminDashboardBookingsAPI, '/admin_dashboard/bookings')
+api.add_resource(AdminDashboardReportsAPI, '/admin_dashboard/reports')
+
 api.add_resource(AddTrekAPI, '/admin_dashboard/treks/add_trek')
 api.add_resource(AddStaffAPI, '/admin_dashboard/staff/add_staff')
+api.add_resource(EditDeleteTrekAPI, '/admin_dashboard/treks/<int:trek_id>')
+api.add_resource(AdminDeleteUserAPI, '/admin_dashboard/users/<int:user_id>')
+api.add_resource(AssignTrekToStaffAPI, '/admin_dashboard/staff/<int:staff_id>/assigned_trek')
+
+api.add_resource(AdminStaffOptionsAPI, '/admin_dashboard/staff_options')
+api.add_resource(AdminStaffStatusAPI, '/admin_dashboard/staff/<int:staff_id>/status')
+api.add_resource(AdminUserStatusAPI, '/admin_dashboard/users/<int:user_id>/status')
 
 api.add_resource(StaffDashboardAPI, '/staff_dashboard')
 api.add_resource(TrekkerDashboardAPI, '/trekker_dashboard')

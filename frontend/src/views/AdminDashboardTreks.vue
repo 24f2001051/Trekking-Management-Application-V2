@@ -27,7 +27,7 @@
                         <th>Trek Name</th>
                         <th>Location</th>
                         <th>Difficulty</th>
-                        <th>Slots</th>
+                        <th>Duration</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -41,13 +41,22 @@
                         <td>{{ trek.trek_id }}</td>
                         <td>{{ trek.trek_name }}</td>
                         <td>{{ trek.location }}</td>
-                        <td>{{ trek.difficulty }}</td>
-                        <td>{{ trek.slots }}</td>
+                        <td>{{
+                                trek.difficulty === 'Explorer'
+                                    ? 'Explorer (Beginner)'
+                                    : trek.difficulty === 'Adventurer'
+                                        ? 'Adventurer (Intermediate)'
+                                        : trek.difficulty === 'Trailblazer'
+                                            ? 'Trailblazer (Advanced)'
+                                            : trek.difficulty
+
+                        }}</td>
+                        <td>{{ trek.duration }}</td>
 
                         <td>
                             <span
                                 class="badge"
-                                :class="trek.status=='Open'
+                                :class="trek.status=='Active'
                                     ? 'bg-success'
                                     : 'bg-danger'"
                             >
@@ -56,9 +65,19 @@
                         </td>
 
                         <td>
-                            <button class="btn btn-sm btn-warning me-2"> ✏️ </button>
+                            <RouterLink
+                                :to="`/admin_dashboard/treks/edit/${trek.trek_id}`"
+                                class="btn btn-sm btn-warning me-2"
+                            >
+                                ✏️
+                            </RouterLink>
 
-                            <button class="btn btn-sm btn-danger"> 🗑️ </button>
+                            <button
+                                class="btn btn-sm btn-danger"
+                                @click="deleteTrek(trek.trek_id)"
+                            >
+                                🗑️
+                            </button>
                         </td>
 
                     </tr>
@@ -95,16 +114,61 @@ async function getTreks(){
     treks.value = await response.json()
 }
 
+async function deleteTrek(trek_id){
+
+    if (!confirm("Are you sure you want to delete this trek?")) {
+        return;
+    }
+    try {
+        const response = await fetch(
+            `http://127.0.0.1:5000/api/admin_dashboard/treks/${trek_id}`,
+            {
+                method:"DELETE",
+                headers:{
+                    "Authentication-Token":
+                        localStorage.getItem("auth_token")
+                }
+            }
+        )
+        const data = await response.json()
+        if(!response.ok){
+            alert(data.message || "Failed to delete trek")
+            return;
+        }
+        alert(data.message, "Trek deleted successfully")
+        await getTreks();
+    } catch (error) {
+        console.error("Error deleting trek:", error);
+        alert("Unable to connect to the server. Please try again later.");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
 onMounted(()=>{
     getTreks()
 })
 
 const filteredTreks = computed(()=>{
+    const text = search.value.trim().toLowerCase()
     return treks.value.filter(trek=>
 
-        trek.trek_name
-            .toLowerCase()
-            .includes(search.value.toLowerCase())
+        String(trek.trek_name ?? '').toLowerCase().includes(text) ||
+        String(trek.difficulty ?? '').toLowerCase().includes(text) ||
+        String(trek.location ?? '').toLowerCase().includes(text) ||
+        String(trek.status ?? '').toLowerCase().includes(text) &&
+        (
+            !['active', 'inactive'].includes(text) ||
+            String(trek.status ?? '').toLowerCase() === text
+        )
     )
 })
 

@@ -53,6 +53,21 @@ const router = createRouter({
             component: () => import('../views/AdminDashboardStaff.vue')
         },
         {
+            path: '/admin_dashboard/users',
+            name: 'admin_dashboard_users',
+            component: () => import('../views/AdminDashboardUsers.vue')
+        },
+        {
+            path: '/admin_dashboard/bookings',
+            name: 'admin_dashboard_bookings',
+            component: () => import('../views/AdminDashboardBookings.vue')
+        },
+        {
+            path: '/admin_dashboard/reports',
+            name: 'admin_dashboard_reports',
+            component: () => import('../views/AdminDashboardReports.vue')
+        },
+        {
             path: '/admin_dashboard/treks/add_trek',
             name: 'admin_add_treks',
             component: () => import('../views/AddTrek.vue')
@@ -62,6 +77,13 @@ const router = createRouter({
             name: 'staff_register',
             component: () => import('../views/StaffRegisterView.vue')
         },
+        {
+            path: '/admin_dashboard/treks/edit/:id',
+            name: 'edit_trek',
+            component: () => import('../views/EditTrek.vue')
+        },
+        
+
     ]
 })
 

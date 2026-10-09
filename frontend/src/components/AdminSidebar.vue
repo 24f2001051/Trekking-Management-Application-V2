@@ -40,11 +40,6 @@
                 </RouterLink>
             </li>
     
-            <li class="nav-item mb-2">
-                <RouterLink class="nav-link" to="/admin_dashboard/settings">
-                    ⚙️ Settings
-                </RouterLink>
-            </li>
     
             <li class="nav-item mt-4">
                 <button class="btn btn-outline-danger w-100" @click="logout">
@@ -89,19 +84,26 @@ const router = useRouter(); // 2. Define it
 const fullname = localStorage.getItem('fullname');
 
 async function logout() {
-    const response = await fetch("http://127.0.0.1:5000/api/logout", {
-        method: "POST",
-        headers: {
-            "Authentication-Token": localStorage.getItem("token")
-        }
-    });
 
-    if (response.ok) {
+    try {
+
+        const token = localStorage.getItem("auth_token");
+        const response = await fetch("http://127.0.0.1:5000/api/logout",
+        {
+            method: "POST",
+            headers: {
+                "Authentication-Token": token
+            }
+        });
+        if (!response.ok) {
+            console.error("Logout API error:", response.status, await response.text());
+        }
+    } catch (error) {
+        console.error("Logout API error:", error);
+    } finally {
         localStorage.clear();
+        console.log("Logout successful");
         router.push("/login");
-    } else {
-        alert("Logout failed");
     }
-    router.push("/login");
 }
 </script>
