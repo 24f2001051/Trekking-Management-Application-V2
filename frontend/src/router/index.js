@@ -27,15 +27,11 @@ const router = createRouter({
             name: 'register',
             component: () => import('../views/RegisterView.vue')
         },
+                // Admin Dahboard Routes
         {
             path: '/admin_dashboard',
             name: 'admin_dashboard',
             component: () => import('../views/AdminDashboard.vue')
-        },
-        {
-            path: '/staff_dashboard',
-            name: 'staff_dashboard',
-            component: () => import('../views/StaffDashboard.vue')
         },
         {
             path: '/trekker_dashboard',
@@ -81,6 +77,32 @@ const router = createRouter({
             path: '/admin_dashboard/treks/edit/:id',
             name: 'edit_trek',
             component: () => import('../views/EditTrek.vue')
+        },
+                    // Staff Dashboard Routes
+        {
+            path: '/staff_dashboard',
+            name: 'staff_dashboard',
+            component: () => import('../views/StaffDashboard.vue')
+        },
+        {
+            path: '/staff_dashboard/my_trek',
+            name: 'staff_my_treks',
+            component: () => import('../views/StaffDashboardMyTrek.vue')
+        },
+        {
+            path: '/staff_dashboard/participants',
+            name: 'staff_participants',
+            component: () => import('../views/StaffDashboardParticipants.vue')
+        },
+        {
+            path: '/staff_dashboard/profile',
+            name: 'staff_profile',
+            component: () => import('../views/StaffDashboardProfile.vue')
+        },
+        {
+            path: '/staff_dashboard/availability/:id',
+            name: 'staff_update_availability',
+            component: () => import('../views/StaffUpdateAvailability.vue')
         },
         
 

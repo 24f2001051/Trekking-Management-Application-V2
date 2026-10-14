@@ -62,8 +62,14 @@ from apis import LoginAPI, LogoutAPI, RegisterAPI
 from apis import AdminDashboardAPI, AdminDashboardTreksAPI, AdminDashboardStaffAPI, AdminDashboardUsersAPI, AdminDashboardBookingsAPI, AdminDashboardReportsAPI
 from apis import AddStaffAPI, AddTrekAPI, EditDeleteTrekAPI, AssignTrekToStaffAPI,AdminDeleteUserAPI ,AdminStaffOptionsAPI, AdminStaffStatusAPI , AdminUserStatusAPI
 
-from apis import  StaffDashboardAPI, TrekkerDashboardAPI, AddTrekAPI
+from apis import StaffDashboardAPI, StaffDashboardMyTrekAPI, StaffDashboardParticipantsAPI, StaffDashboardProfileAPI
+from apis import StaffUpdateAvailabilityAPI
 
+
+
+
+
+from apis import  TrekkerDashboardAPI
 
 
 # api.add_resource(Index, '/')
@@ -88,7 +94,27 @@ api.add_resource(AdminStaffOptionsAPI, '/admin_dashboard/staff_options')
 api.add_resource(AdminStaffStatusAPI, '/admin_dashboard/staff/<int:staff_id>/status')
 api.add_resource(AdminUserStatusAPI, '/admin_dashboard/users/<int:user_id>/status')
 
-api.add_resource(StaffDashboardAPI, '/staff_dashboard')
+api.add_resource(StaffDashboardAPI, '/staff_dashboard') #Staff dashboard
+api.add_resource(StaffDashboardMyTrekAPI, '/staff_dashboard/my_trek')
+api.add_resource(StaffDashboardParticipantsAPI, '/staff_dashboard/participants')
+api.add_resource(StaffDashboardProfileAPI, '/staff_dashboard/profile')
+
+api.add_resource(StaffUpdateAvailabilityAPI, '/staff_dashboard/availability/<int:availability_id>')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 api.add_resource(TrekkerDashboardAPI, '/trekker_dashboard')
 
 

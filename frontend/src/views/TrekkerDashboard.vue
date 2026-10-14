@@ -1,7 +1,13 @@
 <template>
     <DashNavbar />
-    <div class="container mt-5">
-        <h1>{{ role }} Dashboard</h1>
+
+    <div class="d-flex">
+        <TrekkerSidebar />
+
+
+
+
+        <h1> {{ role }} Dashboard</h1>
     
 
     </div>
@@ -10,6 +16,7 @@
 
 <script setup>
 import DashNavbar from '../components/DashNavbar.vue'
+import TrekkerSidebar from '../components/TrekkerSidebar.vue';
 import { useRouter } from 'vue-router'; // 1. Import it
 const router = useRouter(); // 2. Define it
 

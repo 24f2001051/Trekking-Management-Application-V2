@@ -48,6 +48,7 @@ class Trek(db.Model):                   ## Trek Model ##
     # relationship                                     
     bookings = db.relationship('Booking', back_populates='trek', cascade='all, delete-orphan')
     assigned_staff = db.relationship('User', back_populates='assigned_treks', foreign_keys=[assign_staff_id])
+    availabilities = db.relationship('Availability', back_populates='trek', cascade='all, delete-orphan')
 
 
 class Availability(db.Model):              ## Availability Model ##
@@ -60,6 +61,10 @@ class Availability(db.Model):              ## Availability Model ##
     total_slot = db.Column(db.Integer(), nullable=False)
     avail_slot = db.Column(db.Integer(), nullable=False)
     status = db.Column(db.String(), default='Open')
+
+    progress_status = db.Column(db.String(), default='Not Started')  # (Not Started, Started, Ongoing, Completed)
+
+    trek = db.relationship('Trek', back_populates='availabilities')
 
     __table_args__ = (
         db.UniqueConstraint('trek_id', 'start_date', name='unique_trek_date'),

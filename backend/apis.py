@@ -1,10 +1,12 @@
 from flask_restful import Resource
 from flask import jsonify, make_response,request
 from flask_security.utils import hash_password
+from sqlalchemy import func
 from user_datastore import user_datastore
 from database import db
 from model import Trek, Booking, Availability, Trekker_info, Staff_info, User, Role, UserRoles
-from flask_security  import utils, auth_token_required, roles_required
+from flask_security  import utils, auth_token_required, roles_required, current_user
+from datetime import date
 
 class LoginAPI(Resource):
     def post(self):
@@ -623,7 +625,240 @@ class AssignTrekToStaffAPI(Resource):
 
 
 class StaffDashboardAPI(Resource):
-    pass
+    @auth_token_required
+    @roles_required("staff")
+    def get(self):
+        trek = Trek.query.filter_by(assign_staff_id=current_user.id).first()
+
+        if not trek:
+            return make_response(jsonify({"message": "Trek not found"}), 404)
+
+        today = date.today()
+        total_participants = (
+            db.session.query(
+                func.count(func.distinct(Booking.usr_id))
+            )
+            .filter(
+                Booking.trek_id == trek.id,
+                Booking.usr_id.isnot(None),
+                Booking.status != "Cancelled"
+            )
+            .scalar()
+        ) or 0       
+
+        availabilities = (
+            Availability.query
+            .filter_by(trek_id = trek.id)
+            .order_by(Availability.start_date.asc())
+            .all()
+        )
+
+        upcoming_treks = []
+        upcoming_trek_count = None
+        for availability in availabilities:
+            start_date = availability.start_date.strftime('%d %b %Y')
+            end_date = availability.end_date.strftime('%d %b %Y')
+
+            schedule = {
+                'trek_id': trek.id,
+                'availability_id': availability.id,
+                'trek_name': trek.trek_name,
+                'participants': total_participants,
+                "dates": f'{start_date} - {end_date}',
+                "start_date": start_date,
+                "end_date": end_date,
+                'avail_slot': availability.avail_slot,
+                'status': availability.status or 'Not Scheduled',
+                'progress_status': availability.progress_status,
+            }
+
+            if ( availability.start_date >= today ) and (availability.status == 'Open'):
+                upcoming_treks.append(schedule)
+        
+        trek = Trek.query.filter_by(assign_staff_id = current_user.id).first()
+        upcoming_trek_count = len(upcoming_treks)
+
+        return {
+            'trek': 1,
+            'assigned_trek': trek.trek_name,
+            'total_participants': total_participants,
+            'upcoming_treks': upcoming_treks,
+            'upcoming_trek_count': upcoming_trek_count
+
+        }, 200
+
+
+class StaffDashboardMyTrekAPI(Resource):
+    @auth_token_required
+    @roles_required("staff")
+    def get(self):
+        treks = Trek.query.filter_by(assign_staff_id=current_user.id).first()
+
+        if not treks:
+            return make_response(jsonify({"message": "Trek not found"}), 404)
+
+        availabilities = (Availability.query.filter_by(trek_id = treks.id).order_by(Availability.start_date.asc()).all())
+
+        schedules = []
+
+        for availability in availabilities:
+            start_date = availability.start_date.strftime('%d %b %Y')
+            end_date = availability.end_date.strftime('%d %b %Y')
+
+            schedules.append({
+                "availability_id": availability.id,
+                "trek_id": treks.id,
+                "trek_name": treks.trek_name,
+                "dates": f'{start_date} - {end_date}',
+                "total_slot": availability.total_slot,
+                "avail_slot": availability.avail_slot,
+                "status": availability.status or 'Not Scheduled',
+                "progress_status": availability.progress_status
+            })
+
+        return make_response(jsonify({
+            "trek": {
+                "trek_id": treks.id,
+                "trek_name": treks.trek_name,
+                "location": treks.location,
+                "difficulty": treks.difficulty,
+                "duration": treks.duration,
+                "description": treks.description,
+                "status": treks.status,
+                "assign_staff_id": treks.assign_staff_id,
+            },
+            "schedules": schedules
+        }),200)
+
+
+class StaffUpdateAvailabilityAPI(Resource):
+    @auth_token_required
+    @roles_required("staff")
+    def put(self, availability_id):
+        availability = Availability.query.get_or_404(availability_id)
+        trek = Trek.query.filter_by(assign_staff_id=current_user.id, id=availability.trek_id).first()
+
+        if not trek:
+            return make_response(jsonify({"message": "Trek not found"}), 403)
+
+        if not availability:
+            return make_response(jsonify({"message": "Availability not found"}), 404)
+
+        data = request.get_json(silent=True) or {}
+        if not data:
+            return make_response(jsonify({"message": "No data provided"}), 400)
+
+
+        if "avail_slot" in data:
+            try:
+                slots = int(data["avail_slot"])
+            except (TypeError, ValueError):
+                return make_response(jsonify({"message": "Invalid Available Slot"}), 400)
+
+            if slots < 0 or slots > availability.total_slot:
+                return make_response(jsonify({"message": ( f"Available Slots must be between 0 and {availability.total_slot}")}), 400)
+            
+            availability.avail_slot = slots
+
+        if "status" in data:
+            status = data["status"]
+            if status not in ["Open", "Closed"]:
+                return make_response(jsonify({"message": "Invalid status"}), 400)
+            if status == "Open" and availability.avail_slot <= 0:
+                return make_response(jsonify({"message": "Available Slots cannot be zero if status is Open"}), 400)
+
+            availability.status = status
+
+        if "progress_status" in data:
+            progress = data["progress_status"]
+            allowed_progress = ["Not Started", "Started", "Ongoing", "Completed"]
+
+            if progress not in allowed_progress:
+                return make_response(jsonify({"message": "Invalid trek progress status"}), 400)
+            availability.progress_status = progress
+
+        db.session.commit()
+
+        return make_response(jsonify({
+            "message": "Schedule updated successfully",
+            "availability_id": availability.id,
+            "avail_slot": availability.avail_slot,
+            "status": availability.status,
+            "progress_status": availability.progress_status
+            }),200)
+
+class StaffDashboardParticipantsAPI(Resource):
+    @auth_token_required
+    @roles_required("staff")
+    def get(self):
+        trek = Trek.query.filter_by(assign_staff_id=current_user.id).first()
+
+        if not trek:
+            return make_response(jsonify({"message": "Trek not found"}), 403)
+
+        bookings = (Booking.query.filter(
+            Booking.trek_id == trek.id,
+            Booking.usr_id.isnot(None),
+            Booking.status != "Cancelled"
+            ).order_by(Booking.booking_date.desc()).all())
+
+        participants = {}
+
+        for booking in bookings:
+            user = booking.user
+
+            if not user or user.id in participants:
+                continue
+
+            info = Trekker_info.query.filter_by(trekker_id=user.id).first()
+
+            participants[user.id] ={
+                "user_id": user.id,
+                "fullname": user.fullname,
+                "username": user.username,
+                "email": user.email,
+                "phone": (
+                    str(info.phone) if info and info.phone is not None else ""
+                ),
+                "booking_date": (
+                    booking.booking_date.strftime("%d-%m-%Y") if booking.booking_date else ""
+                ),
+                "booking_status": booking.status
+            }
+
+        participant_list = list(participants.values())
+
+        return make_response(jsonify({
+            "trek": trek.trek_name,
+            "participants": participant_list,
+            "total_participants": len(participant_list)
+        }),200)
+
+class StaffDashboardProfileAPI(Resource):
+    @auth_token_required
+    @roles_required("staff")
+    def get(self):
+
+        staff = User.query.get_or_404(current_user.id)
+
+        info = Staff_info.query.filter_by(staff_id=staff.id).first()
+        trek = Trek.query.filter_by(assign_staff_id=staff.id).first()
+
+
+        return make_response(jsonify({
+            "staff_id": staff.id,
+            "fullname": staff.fullname,
+            "username": staff.username,
+            "email": staff.email,
+            "active": staff.active,
+            "designation": (info.designation if info else "N/A"),
+            "experience_years": (info.experience_years if info else None),
+            "phone": (str(info.phone) if info and info.phone is not None else ""),
+            "address": info.address if info else "",
+            "assigned_trek": (trek.trek_name if trek else "N/A")
+        }),200)
+
+
 
 class TrekkerDashboardAPI(Resource):
     pass
