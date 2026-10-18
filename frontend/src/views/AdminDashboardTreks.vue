@@ -66,7 +66,14 @@
 
                         <td>
                             <RouterLink
-                                :to="`/admin_dashboard/treks/edit/${trek.trek_id}`"
+                                :to="`/admin_dashboard/treks/${trek.trek_id}/schedule`"
+                                class="btn btn-sm btn-info me-2"
+                            >
+                                📅
+                            </RouterLink>
+
+                            <RouterLink
+                                :to="`/admin_dashboard/treks/${trek.trek_id}/edit`"
                                 class="btn btn-sm btn-warning me-2"
                             >
                                 ✏️
@@ -94,7 +101,7 @@
 import { ref, computed, onMounted } from "vue";
 import DashNavbar from '@/components/DashNavbar.vue'
 import AdminSidebar from '@/components/AdminSidebar.vue';
-import { useRouter } from 'vue-router'; // 1. Import it
+import { useRouter, RouterLink } from 'vue-router'; // 1. Import it
 const router = useRouter(); // 2. Define it
 
 const search = ref("")
@@ -121,7 +128,7 @@ async function deleteTrek(trek_id){
     }
     try {
         const response = await fetch(
-            `http://127.0.0.1:5000/api/admin_dashboard/treks/${trek_id}`,
+            `http://127.0.0.1:5000/api/admin_dashboard/treks/${trek_id}/delete`,
             {
                 method:"DELETE",
                 headers:{

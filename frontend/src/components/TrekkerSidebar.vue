@@ -11,19 +11,19 @@
 
             <li class="nav-item mb-2">
                 <RouterLink class="nav-link" to="/trekker_dashboard/browse_trek">
-                    🥾 My Trek
+                    🗺️ Browse Trek
                 </RouterLink>
             </li>
 
             <li class="nav-item mb-2">
                 <RouterLink class="nav-link" to="/trekker_dashboard/my_booking">
-                    🥾 My Trek
+                    📋 My Bookings
                 </RouterLink>
             </li>
     
             <li class="nav-item mb-2">
                 <RouterLink class="nav-link" to="/trekker_dashboard/history">
-                    👨‍💼 Participants
+                    🕒 Trekking History
                 </RouterLink>
             </li>
     
@@ -35,7 +35,7 @@
     
             <li class="nav-item mt-4">
                 <button class="btn btn-outline-danger w-100" @click="logout">
-                    Logout
+                    ↪ Logout
                 </button>
             </li>
     

@@ -76,10 +76,10 @@
 
                         <td>
                             <RouterLink
-                                :to="`/admin_dashboard/staff/edit_staff/${staff.staff_id}`"
-                                class="btn btn-primary"
+                                :to="`/admin_dashboard/staff/${staff.staff_id}/edit_staff`"
+                                class="btn btn-sm btn-warning me-2"
                             >
-                                Edit
+                                ✏️
                             </RouterLink>
                             <button
                                 class="btn btn-sm btn-danger"

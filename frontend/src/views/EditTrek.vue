@@ -38,8 +38,8 @@
                 <div class="mb-3">
                     <label for="AssignTrekStaff" class="form-label">Assign Trek Staff:</label>
                     <select class="form-select" id="AssignTrekStaff" placeholder="input trek staff here" required v-model="trek.assign_staff_id">
-                        <option value="null">No Staff Assign</option>
-                        <option v-for="staff in staffs" :key="staff.id" :value="staff.id">
+                        <option :value="null">No Staff Assigned</option>
+                        <option v-for="staff in staffs" :key="staff.staff_id" :value="staff.staff_id">
                             {{ staff.fullname }}
                         </option>
                     </select>
@@ -63,7 +63,7 @@
     </div>
 </template>
 
-<script>
+<script setup>
 import {ref, onMounted} from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -86,52 +86,98 @@ const trek = ref({
 });
 
 async function getTrek() {
-    const response = await fetch(`http://127.0.0.1:5000/api/treks`)
-    const data = await response.json()
+    try {
+        const response = await fetch(`http://127.0.0.1:5000/api/admin_dashboard/treks`,
+            {
+                headers: {
+                    "Authentication-Token": localStorage.getItem("auth_token")
+                }
+            }
+        )
 
-    const found = data.first(item =>item.trek_id == route.params.id)
-
-    if (found) {
-        trek.value = {
-            ...found,
-            description: "",
-            assign_staff_id: null
+        if (!response.ok) {
+            throw new Error('Failed to fetch treks')
         }
-    }
+
+        const data = await response.json()
+
+        const found = data.find(item =>item.trek_id == route.params.id)
+
+        if (found) {
+            trek.value = {
+                trek_name: found.trek_name ?? '',
+                location: found.location ?? '',
+                difficulty: found.difficulty ?? '',
+                duration: found.duration ?? '',
+                description: found.description ?? '',
+                assign_staff_id: found.assigned_staff_id ?? null,
+                status: found.status ?? 'Inactive'
+            
+            }
+        } else {
+            alert('Trek not found')
+            router.push('/admin_dashboard/treks')
+        }
+
+        console.log("Trek data: ", found)
+        console.log("Assigned staff ID: ", found.assigned_staff_id)
+
+    } catch (error) {
+        console.error('Error fetching treks:', error)
+        alert('Unable to load trek details')
+    }    
 }
 
 async function getStaffs() {
-    const response = await fetch(
-        "http://127.0.0.1:5000/api/admin_dashboard/staff_options",
-        {
-            headers: {
-                "Authentication-Token": localStorage.getItem("auth_token")
+    try {
+        const response = await fetch(
+            "http://127.0.0.1:5000/api/admin_dashboard/staff_options",
+            {
+                headers: {
+                    "Authentication-Token": localStorage.getItem("auth_token")
+                }
             }
+        )
+        if (!response.ok) {
+            throw new Error('Failed to fetch staff')
         }
-    ) 
-    staffs.value = await response.json()
+
+        staffs.value = await response.json()
+        console.log("Staff options: ", staffs.value)
+
+    } catch (error) {
+        console.error('Error fetching staff:', error)
+        alert('Unable to load staff options')
+    }
 }
 
-async function updateTreks() {
-    const response = await fetch(
-        `http://127.0.0.1:5000/api/admin_dashboard/treks/${route.params.trek_id}`,
-        {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "Authentication-Token": localStorage.getItem("auth_token")
-            },
-            body: JSON.stringify(trek.value)
+async function editTrek() {
+    try {
+        const response = await fetch(
+            `http://127.0.0.1:5000/api/admin_dashboard/treks/${route.params.id}/edit`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authentication-Token": localStorage.getItem("auth_token")
+                },
+                body: JSON.stringify(trek.value)
+            }
+        )
+        const data = await response.json();
+        console.log(data);
+
+        if (!response.ok) {
+            alert(data.message || "Unable to update trek");
+            return
         }
-    ) 
-    if (!response.ok) {
-        const errorData = await response.json();
-        console.error(errorData);
-        alert(`Updating a Trek failed: ${errorData.message}`);
-        return
+        alert(data.message ||"Trek updated successfully");
+        router.push("/admin_dashboard/treks")
+
+    } catch (error) {
+        console.error("Error updating trek:", error);
+        alert("Unable to connect to the server");
     }
-    alert("Trek updated successfully");
-    router.push("/admin_dashboard/treks")
 }
 
 onMounted(() => {

@@ -76,8 +76,9 @@ class Booking(db.Model):                ## Booking Model ##
     id = db.Column(db.Integer,  primary_key=True)
     usr_id = db.Column(db.Integer, db.ForeignKey(User.id))
     trek_id = db.Column(db.Integer, db.ForeignKey(Trek.id))
+    availability_id = db.Column(db.Integer, db.ForeignKey(Availability.id), nullable=False)
     booking_date = db.Column(db.Date(), nullable=False)
-    status = db.Column(db.String(), nullable=False) #(Booked/Completed/Cancelled)
+    status = db.Column(db.String(), default='Booked') #(Booked/Completed/Cancelled)
     
     user = db.relationship('User', back_populates='bookings')
     trek = db.relationship('Trek', back_populates='bookings')

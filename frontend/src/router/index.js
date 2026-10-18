@@ -34,11 +34,6 @@ const router = createRouter({
             component: () => import('../views/AdminDashboard.vue')
         },
         {
-            path: '/trekker_dashboard',
-            name: 'trekker_dashboard',
-            component: () => import('../views/TrekkerDashboard.vue')
-        },
-        {
             path: '/admin_dashboard/treks',
             name: 'admin_dashboard_treks',
             component: () => import('../views/AdminDashboardTreks.vue')
@@ -74,10 +69,21 @@ const router = createRouter({
             component: () => import('../views/StaffRegisterView.vue')
         },
         {
-            path: '/admin_dashboard/treks/edit/:id',
+            path: '/admin_dashboard/treks/:id/edit',
             name: 'edit_trek',
             component: () => import('../views/EditTrek.vue')
         },
+        {
+            path: '/admin_dashboard/staff/:id/edit_staff',
+            name: 'edit_staff',
+            component: () => import('../views/EditStaff.vue')
+        },
+        {
+            path: '/admin_dashboard/treks/:trek_id/schedule',
+            name: 'schedule_trek',
+            component: () => import('../views/AdminScheduleTrek.vue')
+        },
+
                     // Staff Dashboard Routes
         {
             path: '/staff_dashboard',
@@ -104,7 +110,37 @@ const router = createRouter({
             name: 'staff_update_availability',
             component: () => import('../views/StaffUpdateAvailability.vue')
         },
-        
+                // Trekker Dashboard Routes
+        {
+            path: '/trekker_dashboard',
+            name: 'trekker_dashboard',
+            component: () => import('../views/TrekkerDashboard.vue')
+        },
+        {
+            path: '/trekker_dashboard/browse_trek',
+            name: 'trekker_browse_trek',
+            component: () => import('../views/TrekkerBrowseTrek.vue')
+        },
+        {
+            path: '/trekker_dashboard/my_booking',
+            name: 'trekker_my_bookings',
+            component: () => import('../views/TrekkerDashboardMyBooking.vue')
+        },
+        {
+            path: '/trekker_dashboard/history',
+            name: 'trekker_history',
+            component: () => import('../views/TrekkerDashboardHistory.vue')
+        },
+        {
+            path: '/trekker_dashboard/profile',
+            name: 'trekker_profile',
+            component: () => import('../views/TrekkerDashboardProfile.vue')
+        },
+        {
+            path: '/trekker_dashboard/history',
+            name: 'trekker_history',
+            component: () => import('../views/TrekkerDashboardHistory.vue')
+        },
 
     ]
 })

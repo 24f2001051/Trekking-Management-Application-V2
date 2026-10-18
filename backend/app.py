@@ -60,16 +60,13 @@ class Index(Resource):
 
 from apis import LoginAPI, LogoutAPI, RegisterAPI
 from apis import AdminDashboardAPI, AdminDashboardTreksAPI, AdminDashboardStaffAPI, AdminDashboardUsersAPI, AdminDashboardBookingsAPI, AdminDashboardReportsAPI
-from apis import AddStaffAPI, AddTrekAPI, EditDeleteTrekAPI, AssignTrekToStaffAPI,AdminDeleteUserAPI ,AdminStaffOptionsAPI, AdminStaffStatusAPI , AdminUserStatusAPI
+from apis import AddStaffAPI, AddTrekAPI, EditTrekAPI, DeleteTrekAPI, EditStaffAPI, AssignTrekToStaffAPI, AdminDeleteUserAPI, AdminScheduleTrekAPI, AdminStaffOptionsAPI, AdminStaffStatusAPI, AdminUserStatusAPI
 
 from apis import StaffDashboardAPI, StaffDashboardMyTrekAPI, StaffDashboardParticipantsAPI, StaffDashboardProfileAPI
 from apis import StaffUpdateAvailabilityAPI
 
-
-
-
-
-from apis import  TrekkerDashboardAPI
+from apis import  TrekkerDashboardAPI, TrekkerBrowseTrekAPI, TrekkerDashboardProfileAPI, TrekkerDashboardHistoryAPI, TrekkerDashboardMyBookingAPI
+from apis import  TrekkerCancelBookingAPI, TrekkerBookTrekAPI
 
 
 # api.add_resource(Index, '/')
@@ -86,10 +83,13 @@ api.add_resource(AdminDashboardReportsAPI, '/admin_dashboard/reports')
 
 api.add_resource(AddTrekAPI, '/admin_dashboard/treks/add_trek')
 api.add_resource(AddStaffAPI, '/admin_dashboard/staff/add_staff')
-api.add_resource(EditDeleteTrekAPI, '/admin_dashboard/treks/<int:trek_id>')
+api.add_resource(EditTrekAPI, '/admin_dashboard/treks/<int:trek_id>/edit')
+api.add_resource(DeleteTrekAPI, '/admin_dashboard/treks/<int:trek_id>/delete')
+api.add_resource(EditStaffAPI, '/admin_dashboard/staff/<int:staff_id>/edit_staff')
 api.add_resource(AdminDeleteUserAPI, '/admin_dashboard/users/<int:user_id>')
 api.add_resource(AssignTrekToStaffAPI, '/admin_dashboard/staff/<int:staff_id>/assigned_trek')
 
+api.add_resource(AdminScheduleTrekAPI, '/admin_dashboard/treks/<int:trek_id>/schedule')
 api.add_resource(AdminStaffOptionsAPI, '/admin_dashboard/staff_options')
 api.add_resource(AdminStaffStatusAPI, '/admin_dashboard/staff/<int:staff_id>/status')
 api.add_resource(AdminUserStatusAPI, '/admin_dashboard/users/<int:user_id>/status')
@@ -101,6 +101,14 @@ api.add_resource(StaffDashboardProfileAPI, '/staff_dashboard/profile')
 
 api.add_resource(StaffUpdateAvailabilityAPI, '/staff_dashboard/availability/<int:availability_id>')
 
+api.add_resource(TrekkerDashboardAPI, '/trekker_dashboard') #Trekker dashboard
+api.add_resource(TrekkerBrowseTrekAPI, '/trekker_dashboard/browse_trek')
+api.add_resource(TrekkerDashboardProfileAPI, '/trekker_dashboard/profile')
+api.add_resource(TrekkerDashboardHistoryAPI, '/trekker_dashboard/history')
+api.add_resource(TrekkerDashboardMyBookingAPI, '/trekker_dashboard/my_booking')
+
+api.add_resource(TrekkerCancelBookingAPI, '/trekker_dashboard/my_booking/<int:booking_id>/cancel')
+api.add_resource(TrekkerBookTrekAPI, '/trekker_dashboard/treks/<int:trek_id>/book')
 
 
 
@@ -111,11 +119,6 @@ api.add_resource(StaffUpdateAvailabilityAPI, '/staff_dashboard/availability/<int
 
 
 
-
-
-
-
-api.add_resource(TrekkerDashboardAPI, '/trekker_dashboard')
 
 
 if __name__ == '__main__':

@@ -29,7 +29,7 @@
     
             <li class="nav-item mt-4">
                 <button class="btn btn-outline-danger w-100" @click="logout">
-                    Logout
+                    ↪ Logout
                 </button>
             </li>
     

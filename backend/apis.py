@@ -1,12 +1,12 @@
 from flask_restful import Resource
-from flask import jsonify, make_response,request
+from flask import jsonify, make_response, request, current_app
 from flask_security.utils import hash_password
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from user_datastore import user_datastore
 from database import db
 from model import Trek, Booking, Availability, Trekker_info, Staff_info, User, Role, UserRoles
 from flask_security  import utils, auth_token_required, roles_required, current_user
-from datetime import date
+from datetime import date, timedelta, datetime
 
 class LoginAPI(Resource):
     def post(self):
@@ -81,18 +81,33 @@ class RegisterAPI(Resource):
         
         this_role = user_datastore.find_role('trekker')
 
-        user_datastore.create_user( username=username, email=email,
-            fullname=fullname, password=hash_password(password), roles=[this_role] )
-        db.session.commit()
-        
-        return make_response(jsonify({ "message": "User Registration successful" }), 201)
-    
-    def get(self):
-        pass
-        
-    def put(self):
-        pass
-        
+        if not this_role:
+            return make_response(jsonify({
+                "message": "Trekker role not found" }), 500)
+
+        try:
+            new_user = user_datastore.create_user( username=username.strip(), email=email.strip(),
+                fullname=fullname.strip(), password=hash_password(password), roles=[this_role] )
+            
+            db.session.flush()
+
+            new_trekker_info = Trekker_info(trekker_id=new_user.id)
+            db.session.add(new_trekker_info)
+            
+            db.session.commit()
+            
+            return make_response(jsonify({ "message": "User Registration successful" }), 201)
+
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Failed to register user and create profile.")
+
+            return make_response(jsonify({"message": "Registration failed. Please try again"}), 500)
+
+
+
+
+# Admin Dashboard        
 class AddStaffAPI(Resource):
     @auth_token_required
     @roles_required('admin')
@@ -146,8 +161,6 @@ class AddStaffAPI(Resource):
         except Exception as e:
             db.session.rollback()  # Rollback changes if anything crashes to keep database clean
             return make_response(jsonify({ "message": f"Error saving staff: {str(e)}" }), 500)
-
-
 
 class AdminDashboardAPI(Resource):
     @auth_token_required
@@ -232,9 +245,7 @@ class AdminDashboardStaffAPI(Resource):
 
         return make_response(jsonify(staff_list), 200)
 
-
 class AdminDashboardUsersAPI(Resource):
-
     @auth_token_required
     @roles_required('admin')
     def get(self):
@@ -265,7 +276,6 @@ class AdminDashboardUsersAPI(Resource):
             return make_response(jsonify({
                 "message": str(e)
             }), 500)
-
 
 class AdminDashboardBookingsAPI(Resource):
     @auth_token_required
@@ -318,7 +328,6 @@ class AdminDashboardReportsAPI(Resource):
             "cancelled_bookings": cancelled_bookings,
             }
         ), 200)
-
 
 class AdminDeleteUserAPI(Resource):
     @auth_token_required
@@ -386,41 +395,41 @@ class AdminDeleteUserAPI(Resource):
             jsonify({"message": "Account deleted successfully"}), 200
         )
 
-class EditDeleteTrekAPI(Resource):
+class EditTrekAPI(Resource):
     @auth_token_required
     @roles_required("admin")
-
     def put(self, trek_id):
 
         trek = Trek.query.get_or_404(trek_id)
         if trek is None:
             return make_response(jsonify({"message": "Trek not found"}), 404)
 
-        data = request.get_json()
+        data = request.get_json() or {}
         trek.trek_name = data.get('trek_name', trek.trek_name)
         trek.location = data.get('location', trek.location)
         trek.difficulty = data.get('difficulty', trek.difficulty)
         trek.duration = data.get('duration', trek.duration)
-        trek.description = data.get('description', trek.discription)
+        trek.description = data.get('description', trek.description)
         trek.status = data.get('status', trek.status)
 
-        staff_id = data.get('assign_staff_id', trek.assign_staff_id)
+        if 'assign_staff_id' in data:
+            staff_id = data['assign_staff_id']
 
-        if staff_id is not None:
-            staff = User.query.get_or_404(staff_id)
-            if staff is None:
-                return make_response(jsonify({"message": "Staff not found"}), 404)
+            if staff_id is None:
+                trek.assign_staff_id = None
+            else:
+                staff = User.query.get_or_404(staff_id)
+                if staff is None:
+                    return make_response(jsonify({"message": "Staff not found"}), 404)
+                
+                existing_trek = Trek.query.filter(Trek.assign_staff_id==staff_id, Trek.id!=trek_id).first()
+                if existing_trek is not None:
+                    return make_response(jsonify({"message": (
+                        f"This Staff member is already assigned to "
+                        f"{existing_trek.trek_name}."
+                        )}), 400)
             
-            existing_trek = Trek.query.filter(Trek.assign_staff_id==staff_id, Trek.id!=trek_id).first()
-            if existing_trek is not None:
-                return make_response(jsonify({"message": (
-                    f"Theis Staff member is already assigned to "
-                    f"{existing_trek.trek_name}."
-                    )}), 400)
-           
-            trek.assign_staff_id = staff_id
-
-
+                trek.assign_staff_id = staff_id
 
         try:
             db.session.commit()
@@ -429,6 +438,7 @@ class EditDeleteTrekAPI(Resource):
             db.session.rollback()
             return make_response(jsonify({"message": "Error updating trek: " + str(e)}), 500)
 
+class DeleteTrekAPI(Resource):
     @auth_token_required
     @roles_required("admin")
     def delete(self, trek_id):
@@ -444,6 +454,141 @@ class EditDeleteTrekAPI(Resource):
         except Exception as e:
             db.session.rollback()
             return make_response(jsonify({"message": "Error deleting trek: " + str(e)}), 500)
+
+class EditStaffAPI(Resource):
+    @auth_token_required
+    @roles_required("admin")
+    def get(self, staff_id):
+        staff_profile = Staff_info.query.filter_by(staff_id=staff_id).first()
+
+        if not staff_profile:
+            return make_response(jsonify({"message": "Staff profile not found"}), 404)
+
+        user = User.query.get(staff_profile.staff_id)
+
+        if not user:
+            return make_response(jsonify({"message": "Staff User not found"}), 404)
+
+        dob = (
+            staff_profile.dob.isoformat()
+            if staff_profile.dob
+            else ""
+        )
+
+        return make_response(jsonify({
+            "staff_id": staff_profile.staff_id,
+            "fullname": user.fullname,
+            "username": user.username,
+            "email": user.email,
+            "designation": staff_profile.designation or "",
+            "experience_years": staff_profile.experience_years or 0,
+            "phone": staff_profile.phone,
+            "dob": dob,
+            "gender": staff_profile.gender or "",
+            "address": staff_profile.address or ""
+        }), 200)
+
+    @auth_token_required
+    @roles_required("admin")
+    def put(self, staff_id):
+        staff_profile = Staff_info.query.filter_by(staff_id=staff_id).first()
+
+        if not staff_profile:
+            return make_response(jsonify({"message": "Staff profile not found"}), 404)
+
+        user = User.query.get(staff_profile.staff_id)
+
+        if not user:
+            return make_response(jsonify({"message": "Staff account not found"}), 404)
+
+        data = request.get_json() or {}
+
+        fullname = data.get('fullname', user.fullname)
+        username = data.get('username', user.username)
+        email = data.get('email', user.email)
+
+        designation = data.get('designation', staff_profile.designation)
+        experience_years = data.get('experience_years', staff_profile.experience_years)
+
+        phone = data.get('phone', staff_profile.phone)
+        dob = data.get('dob', staff_profile.dob)
+        gender = data.get('gender', staff_profile.gender)
+        address = data.get('address', staff_profile.address)
+
+        required_fields = {
+            "Full name": fullname,
+            "Username": username,
+            "Email": email,
+            "Designation": designation
+        }
+
+        for field_name, value in required_fields.items():
+            if not isinstance(value, str) or not value.strip():
+                return make_response(jsonify({"message": f"Please provide {field_name}"}), 400)
+
+        fullname = fullname.strip()
+        username = username.strip()
+        email = email.strip()
+        designation = designation.strip()
+
+        duplicate_username = User.query.filter(db.func.lower(User.username) == username.lower(), User.id != user.id).first()
+        if duplicate_username:
+            return make_response(jsonify({"message": "This Username already taken. Please choose another one"}), 409)
+
+        duplicate_email = User.query.filter(db.func.lower(User.email) == email.lower(), User.id != user.id).first()
+        if duplicate_email:
+            return make_response(jsonify({"message": "This Email is already registered. Please use another email"}), 409)
+
+        try:
+            experience_years = int(experience_years)
+            if experience_years < 0:
+                raise ValueError("Experience years cannot be negative")
+        except (TypeError, ValueError):
+            return make_response(jsonify({"message": "Experience years must be a non-negative whole number"}), 400)
+
+
+        if phone not in (None, ""):
+            try:
+                phone = int(phone)
+                if phone < 0:
+                    raise ValueError("Phone number cannot be negative")
+            except (TypeError, ValueError):
+                return make_response(jsonify({"message": "Phone number must contain digits only"}), 400)
+
+        else:
+            phone = None
+
+
+        if dob:
+            try:
+                dob = datetime.strptime(dob, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return make_response(jsonify({"message": "Invalid date of birth format"}), 400)
+
+        else:
+            dob = None
+
+        user.fullname = fullname
+        user.username = username
+        user.email = email
+
+        staff_profile.designation = designation
+        staff_profile.experience_years = experience_years
+        staff_profile.phone = phone
+        staff_profile.dob = dob
+        staff_profile.gender = gender
+        staff_profile.address = address
+
+        try:
+            db.session.commit()
+            return make_response(jsonify({"message": "Staff profile updated successfully"}), 200)
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.exception("Failed to update staff")
+            return make_response(jsonify({"message": "Error updating staff profile: " + str(e)}), 500)
+
+
+
 
 class AdminStaffOptionsAPI(Resource):
     @auth_token_required
@@ -495,7 +640,6 @@ class AdminUserStatusAPI(Resource):
             db.session.rollback()
             return make_response(jsonify({"message": "Error updating Status: " + str(e)}), 500)
 
-
 class AddTrekAPI(Resource):
     @auth_token_required
     @roles_required('admin')
@@ -540,7 +684,6 @@ class AddTrekAPI(Resource):
             return make_response(jsonify({ "message": f"Error saving staff: {str(e)}" }), 500)
 
 class AssignTrekToStaffAPI(Resource):
-
     @auth_token_required
     @roles_required("admin")
     def put(self, staff_id):
@@ -615,6 +758,74 @@ class AssignTrekToStaffAPI(Resource):
                 500
             )
 
+class AdminScheduleTrekAPI(Resource):
+    @auth_token_required
+    @roles_required("admin")
+    def post(self, trek_id):
+        trek = Trek.query.get_or_404(trek_id)
+        data = request.get_json(silent=True) or {}
+
+        try:
+            start_date = date.fromisoformat(data.get("start_date", ""))
+        except (ValueError, TypeError):
+            return make_response(jsonify({"message": "Invalid start date in YYYY-MM-DD format"}), 400)
+
+        try:
+            duration = int(trek.duration)
+            total_slot = int(data.get("total_slot", 0))
+        except (ValueError, TypeError):
+            return make_response(jsonify({"message": "Invalid duration or total slot"}), 400)
+
+        if duration < 1:
+            return make_response(jsonify({"message": "Duration must be at least 1 day"}), 400)
+
+        if total_slot < 1:
+            return make_response(jsonify({"message": "Total slot must be at least 1 seat"}), 400)
+
+        end_date = start_date + timedelta(days=duration - 1)
+
+        existing_availability = Availability.query.filter(
+            Availability.trek_id == trek.id, Availability.start_date == start_date
+        ).first()
+
+        if existing_availability:
+            return make_response(jsonify({"message": "Availability already exists for this date"}), 409)
+
+        overlapping = Availability.query.filter(
+            Availability.trek_id == trek.id, Availability.start_date <= end_date, Availability.end_date >= start_date
+        ).first()
+
+        if overlapping:
+            return make_response(jsonify({"message": "The date range overlaps with an existing trek availability"}), 409)
+
+        try:
+            schedule = Availability(
+                trek_id=trek.id, start_date=start_date, end_date=end_date, total_slot=total_slot,
+                avail_slot=total_slot, status="Open", progress_status="Not Started"
+            )
+
+            db.session.add(schedule)
+
+            trek.status = "Active"
+
+            db.session.commit()
+
+            return make_response(jsonify({
+                "message": "Trek availability scheduled successfully.",
+                "availability_id": schedule.id,
+                "trek_id": trek.id,
+                "trek_name": trek.trek_name,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "total_slot": schedule.total_slot,
+                "avail_slot": schedule.avail_slot,
+                "status": schedule.status,
+                "trek_status": trek.status
+            }), 201)
+
+        except Exception as e:
+            db.session.rollback()
+            return make_response(jsonify({"message": "Unable to schedule trek availability: ", "error": str(e)}), 500)
 
 
 
@@ -623,7 +834,7 @@ class AssignTrekToStaffAPI(Resource):
 
 
 
-
+# Staff Dashboard
 class StaffDashboardAPI(Resource):
     @auth_token_required
     @roles_required("staff")
@@ -687,7 +898,6 @@ class StaffDashboardAPI(Resource):
 
         }, 200
 
-
 class StaffDashboardMyTrekAPI(Resource):
     @auth_token_required
     @roles_required("staff")
@@ -729,7 +939,6 @@ class StaffDashboardMyTrekAPI(Resource):
             },
             "schedules": schedules
         }),200)
-
 
 class StaffUpdateAvailabilityAPI(Resource):
     @auth_token_required
@@ -861,4 +1070,508 @@ class StaffDashboardProfileAPI(Resource):
 
 
 class TrekkerDashboardAPI(Resource):
-    pass
+    @auth_token_required
+    @roles_required("trekker")
+    def get(self):
+        today = date.today()
+
+        schedules = (
+            Availability.query
+            .join(Trek, Availability.trek_id == Trek.id)
+            .filter(
+                Trek.status == "Active",
+                Availability.start_date >= today,
+                Availability.status == "Open",
+                Availability.avail_slot > 0
+            )
+            .order_by(Availability.start_date.asc())
+            .all()
+        )
+
+        available_treks = []
+        seen_trek_ids = set()
+
+        for schedule in schedules:
+            trek = schedule.trek
+            trek_id = trek.id
+
+            if trek_id in seen_trek_ids:
+                continue
+
+            seen_trek_ids.add(trek_id)
+
+            available_treks.append({
+                "trek_id": trek.id,
+                "trek_name": trek.trek_name,
+                "location": trek.location,
+                "difficulty": trek.difficulty,
+                "duration": trek.duration,
+                "description": trek.description,
+                "availability_id": schedule.id,
+                "start_date": schedule.start_date.strftime("%d-%m-%Y"),
+                "end_date": schedule.end_date.strftime("%d-%m-%Y"),
+                "total_slot": schedule.total_slot,
+                "avail_slot": schedule.avail_slot,
+                "availability_status": schedule.status
+            })
+
+        bookings = Booking.query.filter_by(usr_id=current_user.id).all()
+
+        total_bookings = len(bookings)
+
+        upcoming_bookings = sum(
+            1 for booking in bookings
+            if booking.status.lower() in ("booking", "confirmed")
+            and booking.availability_id is not None
+            and (
+                (Availability.query.get(booking.availability_id) is not None)
+                and Availability.query.get(booking.availability_id).start_date >= today
+            )
+        )
+
+        completed_treks = sum(
+            1 for booking in bookings
+            if booking.status.lower() == "completed"
+        )
+
+        recent_bookings = []
+
+        for booking in sorted(bookings, key=lambda item: item.booking_date or date.min, reverse=True)[:5]:
+            schedule = (
+                Availability.query.get(booking.availability_id)
+                if booking.availability_id else None
+            )
+
+            recent_bookings.append({
+                "booking_id": booking.id,
+                "trek_id": booking.trek_id,
+                "trek_name": (booking.trek.trek_name if booking.trek else "N/A"),
+                "booking_date": (booking.booking_date.strftime("%d-%m-%Y") if booking.booking_date else ""),
+                "start_date": (schedule.start_date.strftime("%d-%m-%Y") if schedule else ""),
+                "end_date": (schedule.end_date.strftime("%d-%m-%Y") if schedule else ""),                
+                "status": booking.status
+            })
+
+        return make_response(jsonify({
+            "available_treks": available_treks,
+            "recent_bookings": recent_bookings,
+            "total_bookings": total_bookings,
+            "upcoming_bookings": upcoming_bookings,
+            "completed_treks": completed_treks,
+        }),200)
+
+class TrekkerBrowseTrekAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def get(self):
+        today = date.today()
+
+        search = request.args.get("search", "").strip().lower()
+        difficulty = request.args.get("difficulty", "").strip().lower()
+        location = request.args.get("location", "").strip().lower()
+        duration = request.args.get("duration", "").strip().lower()
+
+        query = (
+            Trek.query
+            .filter(Trek.status == "Active")
+            .order_by(Trek.trek_name.asc())
+        )
+
+        if search:
+            query = query.filter(
+                db.or_(
+                    Trek.trek_name.ilike(f"%{search}%"),
+                    Trek.location.ilike(f"%{search}%")
+                    ))
+
+        if difficulty:
+            query = query.filter(
+                db.func.lower(Trek.difficulty) == difficulty
+            )
+
+
+        if duration:
+            query = query.filter(
+                db.func.lower(Trek.duration).contains(duration)
+            )
+
+        treks = query.all()
+        trek_list = []
+
+
+        for trek in treks:
+            schedules = (
+                Availability.query
+                .filter(
+                    Availability.trek_id == trek.id,
+                    Availability.start_date >= today,
+                    Availability.status == "Open",
+                    Availability.avail_slot > 0
+                )
+                .order_by(Availability.start_date.asc())
+                .all()
+            )
+
+            if not schedules:
+                continue
+
+            schedule_list = []
+
+            for schedule in schedules:
+                schedule_list.append({
+                    "availability_id": schedule.id,
+                    "start_date": schedule.start_date.strftime("%d-%m-%Y"),
+                    "end_date": schedule.end_date.strftime("%d-%m-%Y"),
+                    "total_slot": schedule.total_slot,
+                    "avail_slot": schedule.avail_slot,
+                    "status": schedule.status,
+                    "progress_status": schedule.progress_status
+                })
+
+            trek_list.append({
+                "trek_id": trek.id,
+                "trek_name": trek.trek_name,
+                "location": trek.location,
+                "difficulty": trek.difficulty,
+                "duration": trek.duration,
+                "description": trek.description,
+                "schedules": schedule_list
+            })
+
+        return make_response(jsonify({"treks": trek_list}),200)
+
+class TrekkerBookTrekAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def post(self):
+        data = request.get_json(silent=True) or {}
+        availability_id = data.get("availability_id")
+
+        if not availability_id:
+            return make_response(jsonify({"message": "Please select a trek schedule."}),400)
+
+        try:
+            availability_id = int(availability_id)
+        except (ValueError, TypeError):
+            return make_response(jsonify({
+                "message": "Invalid availability ID."}),400)
+
+        try:
+            schedule = (
+                Availability.query
+                .filter(Availability.id == availability_id)
+                .first()
+            )
+            if not schedule:
+                return make_response(jsonify({
+                    "message": "Trek schedule not found."}),400)
+
+            trek = Trek.query.get(schedule.trek_id)
+
+            if not trek or trek.status != "Active":
+                return make_response(jsonify({
+                    "message": "This Trek not found or not active."}),400)
+
+            if schedule.start_date < date.today():
+                return make_response(jsonify({
+                    "message": "This Trek schedule has already started."}),400)
+
+            if schedule.status != "Open":
+                return make_response(jsonify({
+                    "message": "This Trek schedule is closed."}),400)
+
+            if schedule.avail_slot <= 0:
+                return make_response(jsonify({
+                    "message": "No slots are available."}),409)
+
+            existing_booking = Booking.query.filter(
+                Booking.usr_id == current_user.id,
+                Booking.availability_id == schedule.id,
+                Booking.status.in_(["Booked", "Cancelled", "Completed"])
+            ).first()
+            
+            if existing_booking:
+                return make_response(jsonify({
+                    "message": "You have already booked this trek schedule."
+                }),409)
+
+            schedule.avail_slot -= 1
+
+            booking = Booking(
+                usr_id=current_user.id,
+                trek_id=trek.id,
+                availability_id=schedule.id,
+                booking_date=date.today(),
+                status="Booked"
+            )
+            db.session.add(booking)
+            db.session.commit()
+
+            return make_response(jsonify({
+                "message": "Trek booked successfully.",
+                "booking_id": booking.id,
+                "trek_name": trek.trek_name,
+                "availability_id": schedule.id,
+                "avail_slot": schedule.avail_slot
+            }),201)
+
+        except Exception as error:
+            db.session.rollback()
+            return make_response(jsonify({
+                "message": "Unable to complete booking.",
+                "error": str(error)
+            }), 500)
+
+class TrekkerDashboardMyBookingAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def get(self):
+        bookings = (
+            Booking.query
+            .filter(
+                Booking.usr_id == current_user.id,
+                Booking.status.in_(["Booked", ])
+                )
+            .order_by(Booking.booking_date.desc())
+            .all()
+        )
+
+        booking_list = []
+
+        for booking in bookings:
+            schedule = (
+                Availability.query.get(booking.availability_id)
+                if booking.availability_id else None
+            )
+
+            booking_list.append({
+                "booking_id": booking.id,
+                "trek_id": booking.trek_id,
+                "trek_name": (
+                    booking.trek.trek_name
+                    if booking.trek else "N/A"
+                ),
+                "location": (
+                    booking.trek.location
+                    if booking.trek else "N/A"
+                ),
+                "booking_date": (
+                    booking.booking_date.strftime("%d-%m-%Y")
+                    if booking.booking_date else ""
+                ),
+                "availability_id": booking.availability_id,
+                "start_date": (
+                    schedule.start_date.strftime("%d-%m-%Y")
+                    if schedule else ""
+                ),
+                "end_date": (
+                    schedule.end_date.strftime("%d-%m-%Y")
+                    if schedule else ""
+                ),
+                "availability_status": (
+                    schedule.status if schedule else "Unknown"
+                ),
+                "progress_status": (
+                    schedule.progress_status
+                    if schedule else "Unknown"
+                ),
+                "status": booking.status,
+                
+            })
+
+        return make_response(jsonify(booking_list),200)
+
+class TrekkerCancelBookingAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def post(self, booking_id):
+        try:
+            booking = Booking.query.filter_by(id=booking_id, usr_id=current_user.id).first()
+
+            if not booking:
+                return make_response(jsonify({"message": "Booking not found"}), 404)
+
+            if booking.status != "Booked":
+                return make_response(jsonify({"message": "This Booking cannot be cancelled"}), 400)
+
+            schedule = (
+                Availability.query.get(booking.availability_id)
+                if booking.availability_id else None
+            )
+
+            if not schedule:
+                return make_response(jsonify({
+                    "message": (
+                        "This is an older booking without a linked schedule. "
+                        "Please contact the administrator."
+                    )
+                }), 409)
+
+            if schedule.start_date < date.today():
+                return make_response(jsonify({
+                    "message": "This Trek schedule has already started cannot be cancelled now."}),400)
+
+            booking.status = "Cancelled"
+
+            if schedule.avail_slot < schedule.total_slot:
+                schedule.avail_slot += 1
+
+            db.session.commit()
+            return make_response(jsonify({"message": "Booking cancelled successfully"}), 200)
+
+
+        except Exception as error:
+            db.session.rollback()
+            return make_response(jsonify({
+                "message": "Unable to cancel booking.",
+                "error": str(error)
+                }),500)
+
+class TrekkerDashboardHistoryAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def get(self):
+        bookings = (
+            Booking.query.filter(
+                Booking.usr_id == current_user.id,
+                Booking.status.in_(["Completed", "Cancelled"])
+                )
+            .order_by(Booking.booking_date.desc())
+            .all()
+        )
+
+        history = []
+
+        for booking in bookings:
+            schedule = (
+                Availability.query.get(booking.availability_id)
+                if booking.availability_id else None
+            )
+
+            history.append({
+                "booking_id": booking.id,
+                # "trek_id": booking.trek_id,
+                "trek_name": (
+                    booking.trek.trek_name
+                    if booking.trek else "N/A"
+                ),
+                "location": (
+                    booking.trek.location
+                    if booking.trek else "N/A"
+                ),
+                "booking_date": (
+                    booking.booking_date.strftime("%d-%m-%Y")
+                    if booking.booking_date else ""
+                ),
+                "start_date": (
+                    schedule.start_date.strftime("%d-%m-%Y")
+                    if schedule else ""
+                ),
+                "end_date": (
+                    schedule.end_date.strftime("%d-%m-%Y")
+                    if schedule else ""
+                ),
+                "progress_status": (
+                    schedule.progress_status
+                    if schedule else "Unknown"
+                ),
+                "status": booking.status,
+            })
+
+        return make_response(jsonify({"result": history}),200)
+
+class TrekkerDashboardProfileAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def get(self):
+        user = User.query.get_or_404(current_user.id)
+
+        info = Trekker_info.query.filter_by(trekker_id=user.id).first()
+
+        return make_response(jsonify({
+            "trekker_id": user.id,
+            "username": user.username,
+            "fullname": user.fullname,
+            "email": user.email,
+            "active": user.active,
+            "dob": (
+                info.dob.strftime("%Y-%m-%d")
+                if info and info.dob is not None else ""
+            ),
+            "gender": info.gender if info else "",
+            "phone": str(info.phone) if info and info.phone is not None else "",
+            "address": info.address if info else "",
+        }),200)
+
+    @auth_token_required
+    @roles_required("trekker")
+    def put(self):
+        data = request.get_json(silent=True) or {}
+
+        user = User.query.get_or_404(current_user.id)
+        fullname = data.get("fullname", None)
+        email = data.get("email", None)
+
+        if not str(fullname).strip() or not str(email).strip():
+            return make_response(jsonify({"message": "Please provide fullname and email"}), 400)
+
+        duplicate_email = User.query.filter(User.email==email, User.id != user.id).first()
+
+        if duplicate_email:
+            return make_response(jsonify({"message": "This Email is already registered!"}), 409)
+
+        info = Trekker_info.query.filter_by(trekker_id=user.id).first()
+
+        if not info:
+            info = Trekker_info(trekker_id=user.id)
+            db.session.add(info)
+
+        dob = data.get("dob", None)
+        gender = data.get("gender", None)
+        phone = data.get("phone", None)
+        address = data.get("address", None)
+
+        try:
+            parsed_dob = (date.fromisoformat(dob) if dob else None)
+
+            parsed_phone = None
+
+            if str(phone).strip():
+                parsed_phone = int(phone)
+
+                if parsed_phone < 0:
+                    raise ValueError("Phone number cannot be negative.")
+
+            if gender and gender not in ["M", "F", "O"]:
+                return make_response(jsonify({
+                    "message": "Gender must be M, F or O."
+                }), 400)
+            
+            user.fullname = str(fullname).strip()
+            user.email = str(email).strip()
+
+            info.dob = parsed_dob
+            info.gender = gender or None
+            info.phone = parsed_phone
+            info.address = address
+
+            db.session.commit()
+
+            return make_response(jsonify({
+                "message": "Profile updated successfully."
+            }), 200)
+
+        except (ValueError, TypeError):
+            db.session.rollback()
+            return make_response(jsonify({
+                "message": "Please enter a valid date and phone number."
+            }), 400)
+
+        except Exception as error:
+            db.session.rollback()
+            return make_response(jsonify({
+                "message": "Unable to update profile.",
+                "error": str(error)
+            }), 500)
+
+#....................
