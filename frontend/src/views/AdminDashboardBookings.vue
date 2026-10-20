@@ -11,6 +11,8 @@
                         <th>Booking ID</th>
                         <th>User</th>
                         <th>Trek</th>
+                        <th>Staff</th>
+                        <th>Trek Start Date</th>
                         <th>Booking Date</th>
                         <th>Status</th>
                     </tr>
@@ -18,11 +20,18 @@
                 <tbody>
                     <tr v-for="booking in filteredBookings" :key="booking.booking_id">
                         <td>{{ booking.booking_id }}</td>
-                        <td>{{ booking.user }}</td>
+                        <td>{{ booking.trekker_name }}</td>
                         <td>{{ booking.trek }}</td>
+                        <td>{{ booking.staff_name }}</td>
+                        <td>{{ booking.trek_date }}</td>
                         <td>{{ booking.booking_date }}</td>
                         <td>
-                            <span class="badge bg-success">
+                            <span
+                                class="badge"
+                                :class="booking.status === 'Cancelled'
+                                    ? 'bg-danger'
+                                    : 'bg-success'"
+                            >                                        
                                 {{ booking.status }}
                             </span>
                         </td>

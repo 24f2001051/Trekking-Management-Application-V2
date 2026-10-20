@@ -280,15 +280,18 @@ async function bookTrek(trek) {
 
     bookingId.value = trek.trek_id;
 
+    const trekId = trek.trek_id;
+    const availabilityId = schedule.availability_id;
+
     try {
-        const response = await fetch(`http://127.0.0.1:5000/api/trekker_dashboard/treks/${trek.trek_id}/book`, {
+        const response = await fetch(`http://127.0.0.1:5000/api/trekker_dashboard/treks/${trekId}/book`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authentication-Token': localStorage.getItem('auth_token')
             },
             body: JSON.stringify({
-                availability_id: schedule.availability_id
+                availability_id: availabilityId
             })
         });
 
@@ -305,8 +308,8 @@ async function bookTrek(trek) {
     
     
     } catch (error) {
-        console.error(error);
-        alert('Unable to book the trek. Please try again.');
+        console.error("Error booking trek:", error);
+        alert('Cannot connect to the booking server. Check the Flask terminal.');
     } finally {
         bookingId.value = null;
     }

@@ -37,7 +37,7 @@
                     <form @submit.prevent="scheduleTrek">
                         <div class="mb-3">
                             <label for="start_date" class="form-label">Start Date:</label>
-                            <input id="start_date" v-model="scheduleForm.start_date" type="date" class="form-control" :min="today" required>
+                            <input id="start_date" v-model="scheduleForm.start_date" type="date" class="form-control" :min="tomorrow" required>
                         </div>
 
                         <div class="mb-3">
@@ -98,7 +98,12 @@ function getLocalDateString(date = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
-const today = getLocalDateString();
+
+const tomorrowDate = new Date()
+tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+
+const tomorrow = getLocalDateString(tomorrowDate);
+
 
 const calculatedEndDate = computed(() => {
     if (!scheduleForm.value.start_date || !trek.value) return '';
@@ -160,8 +165,8 @@ async function scheduleTrek() {
         return;
     }
 
-    if (!scheduleForm.value.start_date < today) {
-        errorMessage.value = 'Start date cannot be in the past.';
+    if (!scheduleForm.value.start_date < tomorrow) {
+        errorMessage.value = 'Start date must be of Tomorrow or a future date.';
         return;
     }
 

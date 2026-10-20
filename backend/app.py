@@ -59,7 +59,7 @@ class Index(Resource):
         return {'message': 'Hello, World!'}
 
 from apis import LoginAPI, LogoutAPI, RegisterAPI
-from apis import AdminDashboardAPI, AdminDashboardTreksAPI, AdminDashboardStaffAPI, AdminDashboardUsersAPI, AdminDashboardBookingsAPI, AdminDashboardReportsAPI
+from apis import AdminDashboardAPI, AdminDashboardTreksAPI, AdminDashboardStaffAPI, AdminDashboardUsersAPI, AdminDashboardBookingsAPI, AdminDashboardReportsAPI, AdminDashboardScheduledTreksAPI
 from apis import AddStaffAPI, AddTrekAPI, EditTrekAPI, DeleteTrekAPI, EditStaffAPI, AssignTrekToStaffAPI, AdminDeleteUserAPI, AdminScheduleTrekAPI, AdminStaffOptionsAPI, AdminStaffStatusAPI, AdminUserStatusAPI
 
 from apis import StaffDashboardAPI, StaffDashboardMyTrekAPI, StaffDashboardParticipantsAPI, StaffDashboardProfileAPI
@@ -78,6 +78,7 @@ api.add_resource(AdminDashboardAPI, '/admin_dashboard') #Admin dashboard
 api.add_resource(AdminDashboardTreksAPI, '/admin_dashboard/treks')
 api.add_resource(AdminDashboardStaffAPI, '/admin_dashboard/staff')
 api.add_resource(AdminDashboardUsersAPI, '/admin_dashboard/users')
+api.add_resource(AdminDashboardScheduledTreksAPI, '/admin_dashboard/scheduled_treks')
 api.add_resource(AdminDashboardBookingsAPI, '/admin_dashboard/bookings')
 api.add_resource(AdminDashboardReportsAPI, '/admin_dashboard/reports')
 

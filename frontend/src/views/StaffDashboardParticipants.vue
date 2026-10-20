@@ -50,11 +50,11 @@
                                     <td>
                                         <span
                                             class="badge"
-                                            :class="participant.status === 'Cancelled'
+                                            :class="participant.booking_status === 'Cancelled'
                                                 ? 'bg-danger'
                                                 : 'bg-success'"
                                         >                                        
-                                            {{ participant.status }}
+                                            {{ participant.booking_status }}
                                         </span>
                                     </td>
                                 </tr>

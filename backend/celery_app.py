@@ -1,0 +1,32 @@
+from celery import Celery
+from celery.schedules import crontab
+from app import app
+
+
+celery = Celery(
+    app.import_name,
+    broker=app.config["CELERY_BROKER_URL"],
+    backend=app.config["CELERY_RESULT_BACKEND"],
+    include=["tasks"]
+)
+
+celery.conf.update(
+    timezone=app.config.get("CELERY_TIMEZONE", "Asia/Kolkata"),
+    enable_utc=app.config.get("CELERY_ENABLE_UTC", True),
+    beat_schedule={
+        "update-trek-progress-daily": {
+            "task": "tasks.update_trek_progress",
+            "schedule": crontab(hour=0, minute=5),
+        }
+    }
+)
+
+
+class FlaskContextTask(celery.Task):
+
+    def __call__(self, *args, **kwargs):
+        with app.app_context():
+            return self.run(*args, **kwargs)
+
+
+celery.Task = FlaskContextTask

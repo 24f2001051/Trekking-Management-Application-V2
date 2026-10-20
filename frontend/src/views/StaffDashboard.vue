@@ -103,66 +103,66 @@
 
 
 <script setup>
-    import { ref, onMounted } from "vue";
-    import DashNavbar from '../components/DashNavbar.vue'
-    import StaffSidebar from '@/components/StaffSidebar.vue';
-    import { useRouter } from 'vue-router'; // 1. Import it
-    const router = useRouter(); // 2. Define it
-    
-    const fullname = localStorage.getItem('fullname') || 'Staff';
-    
-    const dashboard = ref({
-        assigned_trek: null,
-        total_participants: 0,
-        upcoming_treks: [],
-        upcoming_treks_count: 0,
-    })
+import { ref, onMounted } from "vue";
+import DashNavbar from '../components/DashNavbar.vue'
+import StaffSidebar from '@/components/StaffSidebar.vue';
+import { useRouter } from 'vue-router'; // 1. Import it
+const router = useRouter(); // 2. Define it
 
-    const loading = ref(false);
-    const errorMessage = ref('');
+const fullname = localStorage.getItem('fullname') || 'Staff';
 
-    
-    async function getDashboard() {
+const dashboard = ref({
+    assigned_trek: null,
+    total_participants: 0,
+    upcoming_treks: [],
+    upcoming_treks_count: 0,
+})
 
-        loading.value = true;
-        errorMessage.value = '';
+const loading = ref(false);
+const errorMessage = ref('');
 
-        try {
-            
-            const response = await fetch("http://127.0.0.1:5000/api/staff_dashboard", {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authentication-Token": localStorage.getItem("auth_token")
-                }
-            });
-    
-            if (!response.ok) {
-                throw new Error(`Unable to load dashboard: HTTP ${response.status}`);
-            }
-    
-            dashboard.value = await response.json();
-    
-        } catch (err) {
-            console.error('Staff Dashboard error:', err);
-            errorMessage.value = err.message || 'Unable to load dashboard';
-        } finally {
-            loading.value = false;
-        }
-    }
 
-    function manageTrek(trek) {
-        router.push({
-            path: '/staff_dashboard/treks',
-            query: {
-                trek_id: trek.trek_id,
-                availability_id: trek.availability_id
+async function getDashboard() {
+
+    loading.value = true;
+    errorMessage.value = '';
+
+    try {
+        
+        const response = await fetch("http://127.0.0.1:5000/api/staff_dashboard", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authentication-Token": localStorage.getItem("auth_token")
             }
         });
-    }
 
-    onMounted(() => {
-        getDashboard();
+        if (!response.ok) {
+            throw new Error(`Unable to load dashboard: HTTP ${response.status}`);
+        }
+
+        dashboard.value = await response.json();
+
+    } catch (err) {
+        console.error('Staff Dashboard error:', err);
+        errorMessage.value = err.message || 'Unable to load dashboard';
+    } finally {
+        loading.value = false;
+    }
+}
+
+function manageTrek(trek) {
+    router.push({
+        path: '/staff_dashboard/manage_trek',
+        query: {
+            trek_id: trek.trek_id,
+            availability_id: trek.availability_id
+        }
     });
-    
-    </script>
+}
+
+onMounted(() => {
+    getDashboard();
+});
+
+</script>

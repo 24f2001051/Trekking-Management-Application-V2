@@ -62,9 +62,10 @@ class Availability(db.Model):              ## Availability Model ##
     avail_slot = db.Column(db.Integer(), nullable=False)
     status = db.Column(db.String(), default='Open')
 
-    progress_status = db.Column(db.String(), default='Not Started')  # (Not Started, Started, Ongoing, Completed)
+    progress_status = db.Column(db.String(), default='Not Started')  # (Not Started,  Ongoing, Completed)
 
     trek = db.relationship('Trek', back_populates='availabilities')
+    bookings = db.relationship('Booking', back_populates='avail') 
 
     __table_args__ = (
         db.UniqueConstraint('trek_id', 'start_date', name='unique_trek_date'),
@@ -82,6 +83,7 @@ class Booking(db.Model):                ## Booking Model ##
     
     user = db.relationship('User', back_populates='bookings')
     trek = db.relationship('Trek', back_populates='bookings')
+    avail = db.relationship('Availability', back_populates='bookings')
 
 
 class Staff_info(db.Model):               ## Staff Info Model ##

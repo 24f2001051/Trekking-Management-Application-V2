@@ -61,7 +61,6 @@
 
                             <select class="form-select" id="progressStatus" v-model="form.progress_status" required>
                                 <option value="Not Started">Not Started</option>
-                                <option value="Started">Started</option>
                                 <option value="Ongoing">Ongoing</option>
                                 <option value="Completed">Completed</option>
                             </select>

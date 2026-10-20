@@ -8,6 +8,20 @@ from model import Trek, Booking, Availability, Trekker_info, Staff_info, User, R
 from flask_security  import utils, auth_token_required, roles_required, current_user
 from datetime import date, timedelta, datetime
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class LoginAPI(Resource):
     def post(self):
         data = request.get_json()
@@ -166,20 +180,32 @@ class AdminDashboardAPI(Resource):
     @auth_token_required
     @roles_required('admin')
     def get(self):
+        today = date.today()
+
         total_treks = Trek.query.count()
         total_users = User.query.join(User.roles).filter_by(name="trekker").count()
         total_staff = User.query.join(User.roles).filter_by(name="staff").count()
-        total_bookings = Booking.query.count()
+        total_bookings = (
+            Booking.query
+            .join(Availability, Booking.availability_id == Availability.id)
+            .filter(
+                Booking.status == "Booked",
+                Availability.end_date > today
+            )
+            .count()
+            )
 
         recent_bookings =( Booking.query.order_by(Booking.booking_date.desc()).limit(3).all() )
         booking_list = []
 
         for booking in recent_bookings:
             booking_list.append({
-                "id": booking.id,
-                "trek": booking.trek.name,
-                "trekker": booking.user.fullname,
-                "date": booking.booking_date.strftime("%d %b %Y"),
+                "booking_id": booking.id,
+                "trek": (booking.trek.trek_name if booking.trek else "N/A"),
+                "trekker_name": (booking.user.fullname if booking.user else "N/A"),
+                "staff_name": (booking.trek.assigned_staff.fullname if booking.trek.assigned_staff else "N/A"),
+                "trek_date": (booking.avail.start_date.strftime("%d %b %Y") if booking.avail else "N/A"),
+                "booking_date": (booking.booking_date.strftime("%d %b %Y") if booking.booking_date else ""),
                 "status": booking.status
             })
 
@@ -277,6 +303,44 @@ class AdminDashboardUsersAPI(Resource):
                 "message": str(e)
             }), 500)
 
+class AdminDashboardScheduledTreksAPI(Resource):
+    @auth_token_required
+    @roles_required("admin")
+    def get(self):
+        schedules = (
+            Availability.query
+            .join(Trek, Availability.trek_id == Trek.id)
+            .order_by(Availability.start_date.desc())
+            .all()
+        )
+
+        schedule_list = []
+
+        for schedule in schedules:
+            trek = schedule.trek
+            schedule_list.append({
+                "availability_id": schedule.id,
+                "trek_id": trek.id,
+                "trek_name": trek.trek_name,
+                "location": trek.location,
+                "duration": trek.duration,
+
+                "assigned_staff": (
+                    trek.assigned_staff.fullname if trek.assigned_staff else "Not Assigned"
+                ),
+
+                "trek_status": trek.status,
+                "start_date": schedule.start_date.isoformat(),
+                "end_date": schedule.end_date.isoformat(),
+                "total_slot": schedule.total_slot,
+                "avail_slot": schedule.avail_slot,
+                "status": schedule.status,
+                "progress_status": schedule.progress_status
+            })
+
+        return make_response(jsonify(schedule_list), 200)
+
+
 class AdminDashboardBookingsAPI(Resource):
     @auth_token_required
     @roles_required("admin")
@@ -287,18 +351,11 @@ class AdminDashboardBookingsAPI(Resource):
         for booking in bookings:
             booking_list.append({
                 "booking_id": booking.id,
-                "user": (
-                    booking.user.fullname
-                    if booking.user else "N/A"
-                ),
-                "trek": (
-                    booking.trek.trek_name
-                    if booking.trek else "N/A"
-                ),
-                "booking_date": (
-                    booking.booking_date.strftime("%d-%m-%Y")
-                    if booking.booking_date else ""
-                ),
+                "trek": (booking.trek.trek_name if booking.trek else "N/A"),
+                "trekker_name": (booking.user.fullname if booking.user else "N/A"),
+                "staff_name": (booking.trek.assigned_staff.fullname if booking.trek.assigned_staff else "N/A"),
+                "trek_date": (booking.avail.start_date.strftime("%d %b %Y") if booking.avail else "N/A"),
+                "booking_date": (booking.booking_date.strftime("%d %b %Y") if booking.booking_date else ""),
                 "status": booking.status
             })
         return make_response(jsonify(booking_list),200)
@@ -314,7 +371,7 @@ class AdminDashboardReportsAPI(Resource):
         total_users = User.query.filter(User.roles.any(name='trekker')).count()
         total_staff = User.query.filter(User.roles.any(name='staff')).count()
         total_bookings = Booking.query.count()
-        confirmed_bookings = Booking.query.filter_by(status="Confirmed").count()
+        confirmed_bookings = Booking.query.filter_by(status="Booked").count()
         cancelled_bookings = Booking.query.filter_by(status="Cancelled").count()
        
         return make_response(jsonify({
@@ -883,7 +940,7 @@ class StaffDashboardAPI(Resource):
                 'progress_status': availability.progress_status,
             }
 
-            if ( availability.start_date >= today ) and (availability.status == 'Open'):
+            if ( availability.start_date >= today ) :
                 upcoming_treks.append(schedule)
         
         trek = Trek.query.filter_by(assign_staff_id = current_user.id).first()
@@ -957,44 +1014,71 @@ class StaffUpdateAvailabilityAPI(Resource):
         if not data:
             return make_response(jsonify({"message": "No data provided"}), 400)
 
+        today = date.today()               #Automation of Progress Status
 
-        if "avail_slot" in data:
-            try:
-                slots = int(data["avail_slot"])
-            except (TypeError, ValueError):
-                return make_response(jsonify({"message": "Invalid Available Slot"}), 400)
 
-            if slots < 0 or slots > availability.total_slot:
-                return make_response(jsonify({"message": ( f"Available Slots must be between 0 and {availability.total_slot}")}), 400)
-            
-            availability.avail_slot = slots
+        if today < availability.start_date:
+            availability.progress_status = "Not Started"
+        elif today < availability.end_date:
+            availability.progress_status = "Ongoing"
+        else:
+            availability.progress_status = "Completed"
 
-        if "status" in data:
-            status = data["status"]
-            if status not in ["Open", "Closed"]:
-                return make_response(jsonify({"message": "Invalid status"}), 400)
-            if status == "Open" and availability.avail_slot <= 0:
-                return make_response(jsonify({"message": "Available Slots cannot be zero if status is Open"}), 400)
+        if availability.progress_status != "Not Started":
+            availability.status = "Closed"
 
-            availability.status = status
+            if availability.progress_status == "Completed":
+                Booking.query.filter(
+                    Booking.availability_id == availability.id,
+                    Booking.status == "Booked"
+                ).update(
+                    {"status": "Completed"},
+                    synchronize_session=False
+                )
 
-        if "progress_status" in data:
-            progress = data["progress_status"]
-            allowed_progress = ["Not Started", "Started", "Ongoing", "Completed"]
+        else:
+            if "avail_slot" in data:
+                try:
+                    slots = int(data["avail_slot"])
+                except (TypeError, ValueError):
+                    return make_response(jsonify({"message": "Invalid Available Slot"}), 400)
 
-            if progress not in allowed_progress:
-                return make_response(jsonify({"message": "Invalid trek progress status"}), 400)
-            availability.progress_status = progress
+                if slots < 0 or slots > availability.total_slot:
+                    return make_response(jsonify({"message": ( f"Available Slots must be between 0 and {availability.total_slot}")}), 400)
+                
+                availability.avail_slot = slots
 
-        db.session.commit()
+            if "status" in data:
+                status = data["status"]
+                if status not in ["Open", "Closed"]:
+                    return make_response(jsonify({"message": "Invalid status"}), 400)
+                if status == "Open" and availability.avail_slot <= 0:
+                    return make_response(jsonify({"message": "Available Slots cannot be zero if status is Open"}), 400)
 
-        return make_response(jsonify({
-            "message": "Schedule updated successfully",
-            "availability_id": availability.id,
-            "avail_slot": availability.avail_slot,
-            "status": availability.status,
-            "progress_status": availability.progress_status
-            }),200)
+                availability.status = status
+
+        try:
+            db.session.commit()
+
+            return make_response(jsonify({
+                "message": "Schedule updated successfully",
+                "availability_id": availability.id,
+                "total_slot": availability.total_slot,
+                "avail_slot": availability.avail_slot,
+                "status": availability.status,
+                "progress_status": availability.progress_status
+                }),200)
+
+        except:
+            db.session.rollback()
+            current_app.logger.exception(
+                "Failed to update trek schedule."
+            )
+            return make_response(jsonify({
+                "message": "Unable to update the trek schedule"
+            }), 500)
+
+
 
 class StaffDashboardParticipantsAPI(Resource):
     @auth_token_required
@@ -1022,6 +1106,7 @@ class StaffDashboardParticipantsAPI(Resource):
             info = Trekker_info.query.filter_by(trekker_id=user.id).first()
 
             participants[user.id] ={
+                "booking_id": booking.id,
                 "user_id": user.id,
                 "fullname": user.fullname,
                 "username": user.username,
@@ -1243,7 +1328,7 @@ class TrekkerBrowseTrekAPI(Resource):
 class TrekkerBookTrekAPI(Resource):
     @auth_token_required
     @roles_required("trekker")
-    def post(self):
+    def post(self, trek_id):
         data = request.get_json(silent=True) or {}
         availability_id = data.get("availability_id")
 
@@ -1259,22 +1344,44 @@ class TrekkerBookTrekAPI(Resource):
         try:
             schedule = (
                 Availability.query
-                .filter(Availability.id == availability_id)
-                .first()
+                .filter(Availability.id == availability_id, Availability.trek_id == trek_id).first()
             )
+
             if not schedule:
                 return make_response(jsonify({
-                    "message": "Trek schedule not found."}),400)
+                    "message": "Trek schedule not found."}),404)
 
-            trek = Trek.query.get(schedule.trek_id)
+            trek = Trek.query.get(trek_id)
 
             if not trek or trek.status != "Active":
                 return make_response(jsonify({
                     "message": "This Trek not found or not active."}),400)
 
-            if schedule.start_date < date.today():
+
+
+            if schedule.start_date <= date.today():
+                schedule.status = "Closed"
+
+                if date.today() < schedule.end_date:
+                    schedule.progress_status = "Ongoing"
+                else:
+                    schedule.progress_status = "Completed"
+
+                    Booking.query.filter(
+                        Booking.availability_id == schedule.id, Booking.status == "Booked"
+                    ).update(
+                        {"status": "Completed"},
+                        synchronize_session=False
+                    )
+
+                db.session.commit()
+
                 return make_response(jsonify({
-                    "message": "This Trek schedule has already started."}),400)
+                    "message": "Bookings are closed because the trek has started.",
+                    "status": schedule.status,
+                    "progress_status": schedule.progress_status
+                }), 400)
+
 
             if schedule.status != "Open":
                 return make_response(jsonify({
@@ -1287,15 +1394,13 @@ class TrekkerBookTrekAPI(Resource):
             existing_booking = Booking.query.filter(
                 Booking.usr_id == current_user.id,
                 Booking.availability_id == schedule.id,
-                Booking.status.in_(["Booked", "Cancelled", "Completed"])
+                Booking.status.in_(["Booked", "Completed"])
             ).first()
             
             if existing_booking:
                 return make_response(jsonify({
                     "message": "You have already booked this trek schedule."
                 }),409)
-
-            schedule.avail_slot -= 1
 
             booking = Booking(
                 usr_id=current_user.id,
@@ -1304,23 +1409,34 @@ class TrekkerBookTrekAPI(Resource):
                 booking_date=date.today(),
                 status="Booked"
             )
+
+            schedule.avail_slot -= 1
+
+            if schedule.avail_slot == 0:
+                schedule.status = "Closed"    
+
             db.session.add(booking)
             db.session.commit()
 
             return make_response(jsonify({
                 "message": "Trek booked successfully.",
                 "booking_id": booking.id,
+                "trek_id": trek.id,
                 "trek_name": trek.trek_name,
                 "availability_id": schedule.id,
-                "avail_slot": schedule.avail_slot
+                "avail_slot": schedule.avail_slot,
+                "status": booking.status
             }),201)
 
         except Exception as error:
             db.session.rollback()
+            current_app.logger.exception("Trek booking failed: %s", error)
             return make_response(jsonify({
                 "message": "Unable to complete booking.",
                 "error": str(error)
             }), 500)
+
+
 
 class TrekkerDashboardMyBookingAPI(Resource):
     @auth_token_required
@@ -1328,10 +1444,8 @@ class TrekkerDashboardMyBookingAPI(Resource):
     def get(self):
         bookings = (
             Booking.query
-            .filter(
-                Booking.usr_id == current_user.id,
-                Booking.status.in_(["Booked", ])
-                )
+            .filter_by(usr_id=current_user.id)
+            .filter(Booking.status == "Booked")
             .order_by(Booking.booking_date.desc())
             .all()
         )
@@ -1413,15 +1527,24 @@ class TrekkerCancelBookingAPI(Resource):
 
             booking.status = "Cancelled"
 
-            if schedule.avail_slot < schedule.total_slot:
-                schedule.avail_slot += 1
+            schedule.avail_slot = min(
+                schedule.total_slot,
+                schedule.avail_slot + 1
+            )
+
 
             db.session.commit()
-            return make_response(jsonify({"message": "Booking cancelled successfully"}), 200)
+            return make_response(jsonify({
+                "message": "Booking cancelled successfully",
+                "booking_id": booking_id,
+                "status": booking.status,
+                "avail_slot": schedule.avail_slot
+                }), 200)
 
 
         except Exception as error:
             db.session.rollback()
+            current_app.logger.exception("Booking cancellation failed: %s", error)
             return make_response(jsonify({
                 "message": "Unable to cancel booking.",
                 "error": str(error)
@@ -1432,11 +1555,10 @@ class TrekkerDashboardHistoryAPI(Resource):
     @roles_required("trekker")
     def get(self):
         bookings = (
-            Booking.query.filter(
-                Booking.usr_id == current_user.id,
-                Booking.status.in_(["Completed", "Cancelled"])
-                )
-            .order_by(Booking.booking_date.desc())
+            Booking.query
+            .filter_by(usr_id=current_user.id)
+            .filter(Booking.status.in_(["Completed", "Cancelled"]))
+            .order_by(Booking.booking_date.desc(), Booking.id.desc())
             .all()
         )
 
@@ -1450,7 +1572,7 @@ class TrekkerDashboardHistoryAPI(Resource):
 
             history.append({
                 "booking_id": booking.id,
-                # "trek_id": booking.trek_id,
+                "trek_id": booking.trek_id,
                 "trek_name": (
                     booking.trek.trek_name
                     if booking.trek else "N/A"
@@ -1463,6 +1585,7 @@ class TrekkerDashboardHistoryAPI(Resource):
                     booking.booking_date.strftime("%d-%m-%Y")
                     if booking.booking_date else ""
                 ),
+                "availability_id": booking.availability_id,
                 "start_date": (
                     schedule.start_date.strftime("%d-%m-%Y")
                     if schedule else ""
@@ -1475,10 +1598,16 @@ class TrekkerDashboardHistoryAPI(Resource):
                     schedule.progress_status
                     if schedule else "Unknown"
                 ),
+                "availability_status": (
+                    schedule.status if schedule else "Unknown"
+                ),
                 "status": booking.status,
             })
 
-        return make_response(jsonify({"result": history}),200)
+        return make_response(jsonify({
+            "result": history,
+            "total_bookings": len(history)
+            }),200)
 
 class TrekkerDashboardProfileAPI(Resource):
     @auth_token_required

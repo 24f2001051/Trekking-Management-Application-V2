@@ -26,6 +26,12 @@
                     👥 Users
                 </RouterLink>
             </li>
+
+            <li class="nav-item mb-2">
+                <RouterLink class="nav-link" to="/admin_dashboard/scheduled_treks">
+                    📅 Scheduled Treks
+                </RouterLink>
+            </li>
     
             <li class="nav-item mb-2">
                 <RouterLink class="nav-link" to="/admin_dashboard/bookings">

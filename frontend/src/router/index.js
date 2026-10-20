@@ -1,6 +1,7 @@
 import {createRouter, createWebHistory} from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 
+
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: [
@@ -47,6 +48,11 @@ const router = createRouter({
             path: '/admin_dashboard/users',
             name: 'admin_dashboard_users',
             component: () => import('../views/AdminDashboardUsers.vue')
+        },
+        {
+            path: '/admin_dashboard/scheduled_treks',
+            name: 'admin_dashboard_scheduled_treks',
+            component: () => import('../views/AdminDashboardScheduledTreks.vue')
         },
         {
             path: '/admin_dashboard/bookings',
@@ -110,6 +116,15 @@ const router = createRouter({
             name: 'staff_update_availability',
             component: () => import('../views/StaffUpdateAvailability.vue')
         },
+        {
+            path: '/staff_dashboard/manage_trek',
+            name: 'staff_manage_trek',
+            component: () => import('../views/StaffManageTrek.vue'),
+            meta: { requiresAuth: true, role: 'staff' }
+        },
+
+
+
                 // Trekker Dashboard Routes
         {
             path: '/trekker_dashboard',
@@ -145,4 +160,37 @@ const router = createRouter({
     ]
 })
 
-export default router
+
+router.beforeEach((to) => {
+    const token = localStorage.getItem('auth_token');
+    const role = localStorage.getItem('role');
+
+    if (to.meta.requiresAuth && !token) {
+        return next('/login');
+    }
+
+    if (to.meta.role && to.meta.role != role) {
+        if (!token) {
+            return next('/login');
+        }
+
+        if (role === 'admin') {
+            return next('/admin_dashboard');
+        }
+
+        if (role === 'staff') {
+            return next('/staff_dashboard');
+        }
+
+        if (role === 'trekker') {
+            return next('/trekker_dashboard');
+        }
+
+        return next('/login');
+    }
+
+    return true;
+});
+
+
+export default router;
