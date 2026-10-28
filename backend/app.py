@@ -4,6 +4,7 @@ from flask_restful import Api, Resource
 from flask_security.utils import hash_password
 from flask_cors import CORS
 from flask_mail import Mail
+from .cache import cache
 
 from .database import db
 from .model import User, Role, UserRoles, Trek, Booking, Availability, Trekker_info, Staff_info
@@ -13,14 +14,15 @@ from .user_datastore import user_datastore
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    cache.init_app(app)
+
     mail = Mail(app)
     
     db.init_app(app)
-
     security = Security(app, user_datastore)
 
     api = Api(app, prefix='/api')
-
 
 
     # login_manager.init_app(app)
@@ -29,29 +31,15 @@ def create_app():
 
 app, api = create_app()
 
-CORS(
-app,
-resources={
-r"/api/*": {
-"origins": [
-"http://localhost:5173",
-"http://127.0.0.1:5173"
-]
-}
+CORS(app, resources={r"/api/*": {
+    "origins": [
+        "http://localhost:5173", "http://127.0.0.1:5173"
+        ]
+    }
 },
-allow_headers=[
-"Content-Type",
-"Authentication-Token",
-"Authorization"
-],
-methods=[
-"GET",
-"POST",
-"PUT",
-"PATCH",
-"DELETE",
-"OPTIONS"
-]
+allow_headers=["Content-Type", "Authentication-Token", "Authorization"],
+
+methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 )
 
 

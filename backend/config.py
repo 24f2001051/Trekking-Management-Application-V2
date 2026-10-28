@@ -2,9 +2,7 @@ import os
 
 class Config():
     SECRET_KEY = 'your_secret_key_here'
-
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
     # SQLALCHEMY_DATABASE_URI = 'sqlite:///mad2_project_db.sqlite3'
     SQLALCHEMY_DATABASE_URI = (
@@ -35,4 +33,11 @@ class Config():
     MAIL_USERNAME = os.getenv("TMS_MAIL_USERNAME")
     MAIL_PASSWORD = os.getenv("TMS_MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.getenv("TMS_MAIL_USERNAME")
+
+    CACHE_TYPE = 'RedisCache'
+    CACHE_REDIS_HOST = '127.0.0.1'
+    CACHE_REDIS_PORT = 6379
+    CACHE_REDIS_DB = 2
+    CACHE_DEFAULT_TIMEOUT = 300 # 5 MIN
+
 

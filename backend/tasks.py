@@ -148,8 +148,8 @@ def send_trek_reminders():
             body = (
                 f"Hi {user.fullname},\n\n"
                 "This is a reminder that your trek is scheduled for tomorrow.\n\n"
-                f"Trek Name: {trek.trek_name}\n"
-                f"Start Date: {tomorrow.strftime('%d-%m-%Y')}\n\n"
+                f"Trek Name: {trek.trek_name}\n\n"
+                f"Start Date: {tomorrow.strftime('%d-%m-%Y')}\n"
                 f"End Date: {schedule.end_date.strftime('%d-%m-%Y')}\n\n"
                 f"Location: {trek.location}\n"
                 "Please prepare for your upcoming trek.\n\n"

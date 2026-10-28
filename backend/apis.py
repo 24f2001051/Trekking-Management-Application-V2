@@ -7,6 +7,7 @@ from .database import db
 from .model import Trek, Booking, Availability, Trekker_info, Staff_info, User, Role, UserRoles
 from flask_security  import utils, auth_token_required, roles_required, current_user
 from datetime import date, timedelta, datetime
+from .cache import cache, invalidate_trek_cache
 
 import json
 import uuid
@@ -27,7 +28,6 @@ def update_schedule_progress(schedule):
     if schedule.progress_status == "Completed":
         Booking.query.filter_by(availability_id=schedule.id, status="Booked"
             ).update({"status": "Completed"}, synchronize_session=False)
-
 
 
 
@@ -241,6 +241,15 @@ class AdminDashboardTreksAPI(Resource):
     @auth_token_required
     @roles_required("admin")
     def get(self):
+        cache_key = "admin_treks_list_v1"
+        cached_treks = cache.get(cache_key)
+
+        if cached_treks:
+            current_app.logger.info(f"CACHE HIT: admin trek listing, {cache_key}")
+            return make_response(jsonify(cached_treks), 200)
+
+        current_app.logger.info(f"CACHE MISS: admin trek listing, {cache_key}")
+        # Get all treks
         treks = Trek.query.all()
         trek_list = []
 
@@ -256,6 +265,8 @@ class AdminDashboardTreksAPI(Resource):
                 "assigned_staff": (trek.assigned_staff.fullname if trek.assigned_staff else "N/A"),
                 "status": trek.status
             })
+        cache.set(cache_key, trek_list, timeout=300)
+
         return make_response(jsonify(trek_list),200)
 
 class AdminDashboardStaffAPI(Resource):
@@ -516,6 +527,7 @@ class EditTrekAPI(Resource):
 
         try:
             db.session.commit()
+            invalidate_trek_cache()
             return  make_response(jsonify({"message": "Trek updated successfully"}), 200)
         except Exception as e:
             db.session.rollback()
@@ -533,6 +545,7 @@ class DeleteTrekAPI(Resource):
         try:
             db.session.delete(trek)
             db.session.commit()
+            invalidate_trek_cache()
             return make_response(jsonify({"message": "Trek deleted successfully"}), 200)
         except Exception as e:
             db.session.rollback()
@@ -760,6 +773,7 @@ class AddTrekAPI(Resource):
             )
             db.session.add(new_trek)
             db.session.commit()
+            invalidate_trek_cache()
             return make_response(jsonify({ "message": "Trek added successfully" }), 201)
 
         except Exception as e:
@@ -794,6 +808,7 @@ class AssignTrekToStaffAPI(Resource):
                     current_trek.assign_staff_id = None
 
                 db.session.commit()
+                invalidate_trek_cache()
                 return make_response(
                     jsonify({"message": "Trek assignment removed"}),
                     200
@@ -828,6 +843,7 @@ class AssignTrekToStaffAPI(Resource):
             selected_trek.assign_staff_id = staff.id
 
             db.session.commit()
+            invalidate_trek_cache()
 
             return make_response(
                 jsonify({"message": "Trek assigned successfully"}),
@@ -892,6 +908,7 @@ class AdminScheduleTrekAPI(Resource):
             trek.status = "Active"
 
             db.session.commit()
+            invalidate_trek_cache()
 
             return make_response(jsonify({
                 "message": "Trek availability scheduled successfully.",
