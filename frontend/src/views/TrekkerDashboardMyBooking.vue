@@ -41,16 +41,42 @@
                             <tr v-for="booking in bookings" :key="booking.booking_id">
                                 <td class="fw-semibold">{{ booking.trek_name }}</td>
                                 <td>{{ booking.location }}</td>
-                                <td>{{ booking.booking_date }}</td>
+                                <td>{{ $formatDate(booking.booking_date) }}</td>
                                 <td>
-                                    {{ booking.start_date || '-' }}
-                                    <span v-if="booking.end_date">
-                                        - {{ booking.end_date }}
-                                    </span>
+                                    {{
+                                        booking.start_date === booking.end_date
+                                            ? $formatDate(booking.start_date)
+                                            : `${$formatDate(booking.start_date)} - ${$formatDate(booking.end_date)}`
+                                    }}
+
                                 </td>
-                                <td>{{ booking.progress_status }}</td>
                                 <td>
-                                    <span class="badge bg-success">{{ booking.status }}</span>
+                                    <span
+                                        class="badge"
+                                        
+                                        :class="{
+                                            'text-bg-light': booking.progress_status == 'Not Started',
+                                            'text-bg-info': booking.progress_status == 'Ongoing',
+                                            'text-bg-dark': booking.progress_status == 'Completed',
+                                        }"
+                                    >                                        
+                                        {{ booking.progress_status }}
+                                    </span>
+
+                                </td>
+                                <td>
+                                    
+                                    <span
+                                        class="badge"
+                                        :class="{
+                                            'text-bg-primary': booking.status == 'Booked',
+                                            'text-bg-danger': booking.status == 'Cancelled',
+                                            'text-bg-success': booking.status == 'Completed',
+                                        }"
+                                    >                                        
+                                        {{ booking.status }}
+                                    </span>
+
                                 </td>
                                 <td>
                                     <button class="btn btn-sm btn-outline-danger"

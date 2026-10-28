@@ -28,15 +28,47 @@
                 </div>
             </div>
 
-            <div class="d-flex flex-wrap gap-2 mb-3">
-                <button v-for="option in filters"
-                    :key="option.value" class="btn btn-sm"
-                    :class="filter === option.value
-                        ? 'btn-outline-primary' : 'btn-outline-secondary'"
-                    @click="filter = option.value">
-                    {{ option.label }}
+            <!-- CSV EXPORT -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div class="d-flex flex-wrap gap-2">
+                    <button
+                        v-for="option in filters"
+                        :key="option.value"
+                        class="btn btn-sm"
+                        :class="filter === option.value
+                            ? 'btn-outline-primary' : 'btn-outline-secondary'"
+                        @click="filter = option.value"
+                    >
+                        {{ option.label }}
+                    </button>
+                </div>
+
+                <button
+                    class="btn btn-success" :disabled="exporting" @click="exportHistory">
+                        <span
+                            v-if="exporting" class="spinner-border spinner-border-sm me-2"
+                        ></span>
+                        {{ exporting ? 'Preparing CSV...' : 'Export CSV' }}
                 </button>
             </div>
+
+            <div v-if="exportMessage" class="alert alert-info">
+                {{ exportMessage }}
+            </div>
+            
+            <div v-if="exportError" class="alert alert-danger">
+                {{ exportError }}
+            </div>
+
+            <button 
+                v-if="exportReady"
+                class="btn btn-primary btn-sm mb-3" @click="downloadExport"
+            >
+                Download Trekking History CSV
+            </button>
+
+
+
 
             <div v-if="loading" class="text-center py-5">
                 <div class="spinner-border text-primary"></div>
@@ -67,13 +99,24 @@
                                 <td class="fw-semibold">{{ item.trek_name }}</td>
                                 <td>{{ item.location }}</td>
                                 <td>
-                                    {{ item.start_date || '-' }}
-                                    <span v-if="item.end_date"> - {{ item.end_date }}</span>
+                                    {{
+                                        item.start_date === item.end_date
+                                            ? $formatDate(item.start_date)
+                                            : `${$formatDate(item.start_date)} - ${$formatDate(item.end_date)}`
+                                    }}
+
                                 </td>
                                 <td>{{ item.booking_date }}</td>
                                 <td>{{ item.progress_status }}</td>
                                 <td>
-                                    <span class="badge" :class="item.status === 'Completed' ? 'bg-success' : 'bg-danger'">
+                                    <span
+                                        class="badge"
+                                        :class="{
+                                            'text-bg-primary': item.status == 'Booked',
+                                            'text-bg-danger': item.status == 'Cancelled',
+                                            'text-bg-success': item.status == 'Completed',
+                                        }"
+                                    >
                                         {{ item.status }}
                                     </span>
                                 </td>
@@ -105,6 +148,14 @@ const history = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
 const filter = ref('all');
+
+const exporting = ref(false);
+const exportMessage = ref('');
+const exportError = ref('');
+const exportReady = ref(false);
+const exportJobId = ref('');
+
+const API_BASE = 'http://127.0.0.1:5000/api/trekker_dashboard/history/export';
 
 const filters = [
     { label: 'All History', value: 'all' },
@@ -160,6 +211,119 @@ async function loadHistory() {
         loading.value = false;
     }
 }
+
+
+// CSV Export
+async function exportHistory() {
+
+    const token = localStorage.getItem('auth_token');
+
+    if (!token) {
+        router.push('/login');
+        return;
+    }
+
+    exporting.value = true;
+    exportReady.value = false;
+    exportError.value = '';
+    exportMessage.value = 'Queueing your CSV export...';
+
+    try {
+        const response = await fetch(API_BASE, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authentication-Token': token
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Unable to start CSV export.');
+        }
+
+        exportJobId.value = data.job_id;
+        exportMessage.value = 'CSV is being generated. Please wait...';
+
+        for (let attempt = 0; attempt < 60; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const statusResponse = await fetch(`${API_BASE}/${exportJobId.value}/status`, {
+                method: 'GET',
+                headers: {
+                    'Authentication-Token': token
+                }
+            });
+
+            const statusData = await statusResponse.json();
+
+            if (!statusResponse.ok) {
+                throw new Error(statusData.message || 'Unable to check CSV export status.');
+            }
+
+            if (statusData.status === 'completed') {
+                exportReady.value = true;
+                exportMessage.value = `CSV ready! ${statusData.record_count} records exported.`;
+                return;
+            }
+
+            if (statusData.status === 'failed') {
+                throw new Error(statusData.message || 'CSV export failed.');
+            }
+        }
+
+        exportMessage.value = 'The export is taking longer than expected. Please wait...';
+
+    } catch (error) {
+        exportError.value = error.message || 'Unable to start CSV export.';
+        exportMessage.value = '';
+    } finally {
+        exporting.value = false;
+    }
+}
+
+async function downloadExport() {
+    const token = localStorage.getItem('auth_token');
+
+    if (!token) {
+        router.push('/login');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/${exportJobId.value}/download`, {
+            method: 'GET',
+            headers: {
+                'Authentication-Token': token
+            }
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.message || 'Unable to download CSV file.');
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'trekking_history.csv';
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);    
+    
+    } catch (error) {
+        exportError.value = error.message || 'Download error:';
+    }
+}
+
+
+
+
+
+
+
 
 onMounted(() => {
     loadHistory();

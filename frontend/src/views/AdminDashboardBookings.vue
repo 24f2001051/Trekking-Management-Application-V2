@@ -28,11 +28,35 @@
                         <td>
                             <span
                                 class="badge"
-                                :class="booking.status === 'Cancelled'
-                                    ? 'bg-danger'
-                                    : 'bg-success'"
+                                :class="{
+                                    'text-bg-primary': booking.booking_status == 'Booked',
+                                    'text-bg-danger': booking.booking_status == 'Cancelled',
+                                    'text-bg-success': booking.booking_status == 'Completed',
+                                }"
                             >                                        
-                                {{ booking.status }}
+                                {{ booking.booking_status }}
+                            </span>
+
+                            <span
+                                v-if="
+                                    booking.booking_status !== 'Cancelled' &&
+                                    !(booking.booking_status === 'Completed' &&
+                                    booking.progress_status === 'Completed')
+                                "
+                                class="badge ms-3"
+                                :class="{
+                                    'text-bg-light': booking.progress_status == 'Not Started',
+                                    'text-bg-info': booking.progress_status == 'Ongoing',
+                                    'text-bg-dark': booking.progress_status == 'Completed',
+                                }"
+                            >
+                                {{ booking.progress_status || 'N/A' }}
+                            </span>
+                            <span
+                                v-else-if="booking.booking_status === 'Cancelled'"
+                                class="text-muted"
+                            >
+                                -
                             </span>
                         </td>
                     </tr>

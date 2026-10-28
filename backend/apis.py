@@ -1,22 +1,32 @@
 from flask_restful import Resource
-from flask import jsonify, make_response, request, current_app
+from flask import jsonify, make_response, request, current_app, send_file
 from flask_security.utils import hash_password
 from sqlalchemy import func, or_
-from user_datastore import user_datastore
-from database import db
-from model import Trek, Booking, Availability, Trekker_info, Staff_info, User, Role, UserRoles
+from .user_datastore import user_datastore
+from .database import db
+from .model import Trek, Booking, Availability, Trekker_info, Staff_info, User, Role, UserRoles
 from flask_security  import utils, auth_token_required, roles_required, current_user
 from datetime import date, timedelta, datetime
 
+import json
+import uuid
+from pathlib import Path
 
+def update_schedule_progress(schedule):
+    today = date.today()
 
+    if today < schedule.start_date:
+        schedule.progress_status = "Not Started"
+    elif today <= schedule.end_date:
+        schedule.progress_status = "Ongoing"
+    else:
+        schedule.progress_status = "Completed"
 
-
-
-
-
-
-
+    if schedule.progress_status in ["Ongoing", "Completed"]:
+        schedule.status = "Closed"
+    if schedule.progress_status == "Completed":
+        Booking.query.filter_by(availability_id=schedule.id, status="Booked"
+            ).update({"status": "Completed"}, synchronize_session=False)
 
 
 
@@ -119,8 +129,6 @@ class RegisterAPI(Resource):
             return make_response(jsonify({"message": "Registration failed. Please try again"}), 500)
 
 
-
-
 # Admin Dashboard        
 class AddStaffAPI(Resource):
     @auth_token_required
@@ -199,6 +207,10 @@ class AdminDashboardAPI(Resource):
         booking_list = []
 
         for booking in recent_bookings:
+            schedule = booking.avail
+            if schedule:
+                update_schedule_progress(schedule)
+
             booking_list.append({
                 "booking_id": booking.id,
                 "trek": (booking.trek.trek_name if booking.trek else "N/A"),
@@ -206,7 +218,14 @@ class AdminDashboardAPI(Resource):
                 "staff_name": (booking.trek.assigned_staff.fullname if booking.trek.assigned_staff else "N/A"),
                 "trek_date": (booking.avail.start_date.strftime("%d %b %Y") if booking.avail else "N/A"),
                 "booking_date": (booking.booking_date.strftime("%d %b %Y") if booking.booking_date else ""),
-                "status": booking.status
+                "booking_status": booking.status,
+                "progress_status": (
+                    None
+                    if booking.status == "Cancelled"
+                    else (
+                        schedule.progress_status if schedule else None
+                    )
+                ),
             })
 
         return make_response(jsonify({
@@ -356,7 +375,14 @@ class AdminDashboardBookingsAPI(Resource):
                 "staff_name": (booking.trek.assigned_staff.fullname if booking.trek.assigned_staff else "N/A"),
                 "trek_date": (booking.avail.start_date.strftime("%d %b %Y") if booking.avail else "N/A"),
                 "booking_date": (booking.booking_date.strftime("%d %b %Y") if booking.booking_date else ""),
-                "status": booking.status
+                "booking_status": booking.status,
+                "progress_status": (
+                    None
+                    if booking.status == "Cancelled"
+                    else (
+                        booking.avail.progress_status if booking.avail else None
+                    )
+                ),
             })
         return make_response(jsonify(booking_list),200)
 
@@ -888,9 +914,6 @@ class AdminScheduleTrekAPI(Resource):
 
 
 
-
-
-
 # Staff Dashboard
 class StaffDashboardAPI(Resource):
     @auth_token_required
@@ -901,18 +924,7 @@ class StaffDashboardAPI(Resource):
         if not trek:
             return make_response(jsonify({"message": "Trek not found"}), 404)
 
-        today = date.today()
-        total_participants = (
-            db.session.query(
-                func.count(func.distinct(Booking.usr_id))
-            )
-            .filter(
-                Booking.trek_id == trek.id,
-                Booking.usr_id.isnot(None),
-                Booking.status != "Cancelled"
-            )
-            .scalar()
-        ) or 0       
+        today = date.today()     
 
         availabilities = (
             Availability.query
@@ -921,17 +933,31 @@ class StaffDashboardAPI(Resource):
             .all()
         )
 
+        overall_treks = []
         upcoming_treks = []
         upcoming_trek_count = None
+
         for availability in availabilities:
             start_date = availability.start_date.strftime('%d %b %Y')
             end_date = availability.end_date.strftime('%d %b %Y')
+
+            participant_count = (
+                db.session.query(
+                    func.count(func.distinct(Booking.usr_id))
+                )
+                .filter(
+                    Booking.availability_id == availability.id,
+                    Booking.usr_id.isnot(None),
+                    Booking.status == "Booked"
+                ).scalar()
+            ) or 0
+
 
             schedule = {
                 'trek_id': trek.id,
                 'availability_id': availability.id,
                 'trek_name': trek.trek_name,
-                'participants': total_participants,
+                'participants': participant_count,
                 "dates": f'{start_date} - {end_date}',
                 "start_date": start_date,
                 "end_date": end_date,
@@ -940,8 +966,11 @@ class StaffDashboardAPI(Resource):
                 'progress_status': availability.progress_status,
             }
 
-            if ( availability.start_date >= today ) :
-                upcoming_treks.append(schedule)
+            if ( availability.start_date >= today):
+                overall_treks.append(schedule)
+
+                if (availability.progress_status == "Not Started"):
+                    upcoming_treks.append(schedule)
         
         trek = Trek.query.filter_by(assign_staff_id = current_user.id).first()
         upcoming_trek_count = len(upcoming_treks)
@@ -949,7 +978,10 @@ class StaffDashboardAPI(Resource):
         return {
             'trek': 1,
             'assigned_trek': trek.trek_name,
-            'total_participants': total_participants,
+            'total_participants': sum(
+                item['participants'] for item in overall_treks
+            ),
+            'overall_treks': overall_treks,
             'upcoming_treks': upcoming_treks,
             'upcoming_trek_count': upcoming_trek_count
 
@@ -1019,7 +1051,7 @@ class StaffUpdateAvailabilityAPI(Resource):
 
         if today < availability.start_date:
             availability.progress_status = "Not Started"
-        elif today < availability.end_date:
+        elif today <= availability.end_date:
             availability.progress_status = "Ongoing"
         else:
             availability.progress_status = "Completed"
@@ -1079,7 +1111,6 @@ class StaffUpdateAvailabilityAPI(Resource):
             }), 500)
 
 
-
 class StaffDashboardParticipantsAPI(Resource):
     @auth_token_required
     @roles_required("staff")
@@ -1117,7 +1148,8 @@ class StaffDashboardParticipantsAPI(Resource):
                 "booking_date": (
                     booking.booking_date.strftime("%d-%m-%Y") if booking.booking_date else ""
                 ),
-                "booking_status": booking.status
+                "booking_status": booking.status,
+                "progress_status": booking.avail.progress_status,
             }
 
         participant_list = list(participants.values())
@@ -1151,7 +1183,6 @@ class StaffDashboardProfileAPI(Resource):
             "address": info.address if info else "",
             "assigned_trek": (trek.trek_name if trek else "N/A")
         }),200)
-
 
 
 class TrekkerDashboardAPI(Resource):
@@ -1202,7 +1233,7 @@ class TrekkerDashboardAPI(Resource):
 
         bookings = Booking.query.filter_by(usr_id=current_user.id).all()
 
-        total_bookings = len(bookings)
+        total_bookings = len(Booking.query.filter_by(usr_id=current_user.id, status="Booked").all())
 
         upcoming_bookings = sum(
             1 for booking in bookings
@@ -1234,7 +1265,8 @@ class TrekkerDashboardAPI(Resource):
                 "booking_date": (booking.booking_date.strftime("%d-%m-%Y") if booking.booking_date else ""),
                 "start_date": (schedule.start_date.strftime("%d-%m-%Y") if schedule else ""),
                 "end_date": (schedule.end_date.strftime("%d-%m-%Y") if schedule else ""),                
-                "status": booking.status
+                "booking_status": booking.status,
+                "progress_status": booking.avail.progress_status,
             })
 
         return make_response(jsonify({
@@ -1357,12 +1389,12 @@ class TrekkerBookTrekAPI(Resource):
                 return make_response(jsonify({
                     "message": "This Trek not found or not active."}),400)
 
+            today = date.today()
 
-
-            if schedule.start_date <= date.today():
+            if schedule.start_date <= today:
                 schedule.status = "Closed"
 
-                if date.today() < schedule.end_date:
+                if today <= schedule.end_date:
                     schedule.progress_status = "Ongoing"
                 else:
                     schedule.progress_status = "Completed"
@@ -1435,7 +1467,6 @@ class TrekkerBookTrekAPI(Resource):
                 "message": "Unable to complete booking.",
                 "error": str(error)
             }), 500)
-
 
 
 class TrekkerDashboardMyBookingAPI(Resource):
@@ -1702,5 +1733,126 @@ class TrekkerDashboardProfileAPI(Resource):
                 "message": "Unable to update profile.",
                 "error": str(error)
             }), 500)
+
+
+
+
+class TrekkerHistoryExportAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def post(self):
+        """Queue a CSV export for the logged-in trekker."""
+        from backend.tasks import export_trekking_history
+
+        job_id = str(uuid.uuid4())
+        user_id = current_user.id
+
+        export_dir = Path(current_app.root_path) / "exports"
+        jobs_dir = export_dir / "jobs"
+        jobs_dir.mkdir(parents=True, exist_ok=True)
+
+        job_file = jobs_dir / f"{job_id}.json"
+        job_file.write_text(json.dumps({
+            "status": "queued",
+            "user_id": user_id,
+            "message": "Your CSV export has been queued."
+        }),
+        encoding="utf-8"
+        )
+
+        try:
+            export_trekking_history.apply_async(
+                args=[user_id, job_id],
+                task_id=job_id
+                )
+        except Exception:
+            job_file.write_text(json.dumps({"status": "failed", "user_id": user_id, "message": "Unable to queue your export."}), encoding="utf-8")
+
+            current_app.logger.exception("Unable to queue CSV export.")
+
+            return make_response(jsonify({
+                "message": "Unable to queue CSV export."
+            }), 503)
+
+
+        return make_response(jsonify({
+            "job_id": job_id,
+            "status": "queued",
+            "message": "Your CSV export has been queued."
+        }), 202)
+
+class TrekkerHistoryExportStatusAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def get(self, job_id):
+        """Return export status only to the requesting trekker."""
+        try:
+            job_id = str(uuid.UUID(job_id))
+        except ValueError:
+            return make_response(jsonify({
+                "message": "Invalid job ID."
+            }), 400)
+
+        jobs_dir = Path(current_app.root_path) / "exports" / "jobs"
+        job_file = jobs_dir / f"{job_id}.json"
+
+        if not job_file.exists():
+            return make_response(jsonify({
+                "message": "Export job not found."
+            }), 404)
+
+        job = json.loads(job_file.read_text(encoding="utf-8"))
+
+        if job.get("user_id") != current_user.id:
+            return make_response(jsonify({
+                "message": "You are not authorized to view this export job."
+            }), 403)
+
+        return make_response(jsonify(job), 200)
+
+class TrekkerHistoryExportDownloadAPI(Resource):
+    @auth_token_required
+    @roles_required("trekker")
+    def get(self, job_id):
+        """Download the export file."""
+        try:
+            job_id = str(uuid.UUID(job_id))
+        except ValueError:
+            return make_response(jsonify({
+                "message": "Invalid export job ID."
+            }), 400)
+
+        export_dir = Path(current_app.root_path) / "exports"
+        jobs_dir = export_dir / "jobs"
+        job_file = jobs_dir / f"{job_id}.json"
+
+        if not job_file.exists():
+            return make_response(jsonify({
+                "message": "Export job not found."
+            }), 404)
+
+        job = json.loads(job_file.read_text(encoding="utf-8"))
+
+        if job.get("user_id") != current_user.id:
+            return make_response(jsonify({
+                "message": "You cannot download this export."
+            }), 403)
+
+        if job.get("status") != "completed":
+            return make_response(jsonify({
+                "message": "Your CSV export is not ready yet."
+            }), 409)
+
+        csv_file = export_dir / f"{job_id}.csv"
+
+        if not csv_file.is_file():
+            return make_response(jsonify({
+                "message": "Export file not found."
+            }), 404)
+
+        return send_file(csv_file, mimetype="text/csv", as_attachment=True, download_name="trekker_history.csv")
+
+
+
 
 #....................

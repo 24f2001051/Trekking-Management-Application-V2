@@ -157,6 +157,7 @@ const router = createRouter({
             component: () => import('../views/TrekkerDashboardHistory.vue')
         },
 
+    
     ]
 })
 

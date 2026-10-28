@@ -51,7 +51,8 @@
                         <th>Staff</th>
                         <th>Trek Start Date</th>
                         <th>Booking Date</th>
-                        <th>Status</th>
+                        <th>Booking & Progress Status</th>
+                        <!-- <th>Progress Status</th> -->
                 </tr> </thead>
 
                 <tbody>
@@ -63,17 +64,42 @@
                         <td>{{ booking.trekker_name }}</td>
                         <td>{{ booking.trek }}</td>
                         <td>{{ booking.staff_name }}</td>
-                        <td>{{ booking.trek_date }}</td>
-                        <td>{{ booking.booking_date }}</td>
+                        <td>{{ $formatDate(booking.trek_date) }}</td>
+                        <td>{{ $formatDate(booking.booking_date) }}</td>
                         <td>
                             <span
                                 class="badge"
-                                :class="booking.status === 'Cancelled'
-                                    ? 'bg-danger'
-                                    : 'bg-success'"
+                                :class="{
+                                    'text-bg-primary': booking.booking_status == 'Booked',
+                                    'text-bg-danger': booking.booking_status == 'Cancelled',
+                                    'text-bg-success': booking.booking_status == 'Completed',
+                                }"
                             >                                        
-                                {{ booking.status }}
+                                {{ booking.booking_status }}
                             </span>
+                        
+                            <span
+                                v-if="
+                                    booking.booking_status !== 'Cancelled' &&
+                                    !(booking.booking_status === 'Completed' &&
+                                    booking.progress_status === 'Completed')
+                                "
+                                class="badge ms-5"
+                                :class="{
+                                    'text-bg-light ': booking.progress_status == 'Not Started',
+                                    'text-bg-info': booking.progress_status == 'Ongoing',
+                                    'text-bg-dark': booking.progress_status == 'Completed',
+                                }"
+                            >
+                                {{ booking.progress_status || 'N/A' }}
+                            </span>
+                            <span
+                                v-else-if="booking.booking_status === 'Cancelled'"
+                                class="text-muted"
+                            >
+                                -
+                            </span>
+
                         </td>
                     </tr>
                 </tbody>

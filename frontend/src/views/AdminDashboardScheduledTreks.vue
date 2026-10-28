@@ -91,7 +91,15 @@
                             <td>{{ schedule.trek_name }}</td>
                             <td>{{ schedule.location }}</td>
                             <td>{{ schedule.assigned_staff }}</td>
-                            <td>{{ formatDate(schedule.start_date) }} - {{ formatDate(schedule.end_date) }}</td>
+                            <td>
+                                {{
+                                    schedule.start_date === schedule.end_date
+                                        ? $formatDate(schedule.start_date)
+                                        : `${$formatDate(schedule.start_date)} - ${$formatDate(schedule.end_date)}`
+                                
+                                }}
+
+                            </td>
                             <td>{{ schedule.duration }}</td>
                             
                             <td>{{ schedule.total_slot }}</td>
@@ -105,10 +113,15 @@
 
                             
                             <td>
-                                <span class="badge"
-                                    :class="schedule.progress_status === 'Ongoing'
-                                        ? 'text-primary fw-bold'
-                                        : 'text-info fw-bold'">
+                                <span
+                                    class="badge"
+                                    :class="{
+                                        'text-bg-light': schedule.progress_status == 'Not Started',
+                                        'text-bg-info': schedule.progress_status == 'Ongoing',
+                                        'text-bg-dark': schedule.progress_status == 'Completed',
+                                    }"
+
+                                >
                                     {{ schedule.progress_status }}
                                 </span>
                             </td>

@@ -3,20 +3,21 @@ from flask_security import Security
 from flask_restful import Api, Resource
 from flask_security.utils import hash_password
 from flask_cors import CORS
+from flask_mail import Mail
 
-from database import db
-from model import User, Role, UserRoles, Trek, Booking, Availability, Trekker_info, Staff_info
-from config import Config
-from user_datastore import user_datastore
+from .database import db
+from .model import User, Role, UserRoles, Trek, Booking, Availability, Trekker_info, Staff_info
+from .config import Config
+from .user_datastore import user_datastore
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    mail = Mail(app)
     
     db.init_app(app)
-    
+
     security = Security(app, user_datastore)
-    app.app_context().push()
 
     api = Api(app, prefix='/api')
 
@@ -58,15 +59,17 @@ class Index(Resource):
     def get(self):
         return {'message': 'Hello, World!'}
 
-from apis import LoginAPI, LogoutAPI, RegisterAPI
-from apis import AdminDashboardAPI, AdminDashboardTreksAPI, AdminDashboardStaffAPI, AdminDashboardUsersAPI, AdminDashboardBookingsAPI, AdminDashboardReportsAPI, AdminDashboardScheduledTreksAPI
-from apis import AddStaffAPI, AddTrekAPI, EditTrekAPI, DeleteTrekAPI, EditStaffAPI, AssignTrekToStaffAPI, AdminDeleteUserAPI, AdminScheduleTrekAPI, AdminStaffOptionsAPI, AdminStaffStatusAPI, AdminUserStatusAPI
+from .apis import LoginAPI, LogoutAPI, RegisterAPI
+from .apis import AdminDashboardAPI, AdminDashboardTreksAPI, AdminDashboardStaffAPI, AdminDashboardUsersAPI, AdminDashboardBookingsAPI, AdminDashboardReportsAPI, AdminDashboardScheduledTreksAPI
+from .apis import AddStaffAPI, AddTrekAPI, EditTrekAPI, DeleteTrekAPI, EditStaffAPI, AssignTrekToStaffAPI, AdminDeleteUserAPI, AdminScheduleTrekAPI, AdminStaffOptionsAPI, AdminStaffStatusAPI, AdminUserStatusAPI
 
-from apis import StaffDashboardAPI, StaffDashboardMyTrekAPI, StaffDashboardParticipantsAPI, StaffDashboardProfileAPI
-from apis import StaffUpdateAvailabilityAPI
+from .apis import StaffDashboardAPI, StaffDashboardMyTrekAPI, StaffDashboardParticipantsAPI, StaffDashboardProfileAPI
+from .apis import StaffUpdateAvailabilityAPI
 
-from apis import  TrekkerDashboardAPI, TrekkerBrowseTrekAPI, TrekkerDashboardProfileAPI, TrekkerDashboardHistoryAPI, TrekkerDashboardMyBookingAPI
-from apis import  TrekkerCancelBookingAPI, TrekkerBookTrekAPI
+from .apis import  TrekkerDashboardAPI, TrekkerBrowseTrekAPI, TrekkerDashboardProfileAPI, TrekkerDashboardHistoryAPI, TrekkerDashboardMyBookingAPI
+from .apis import  TrekkerCancelBookingAPI, TrekkerBookTrekAPI
+
+from .apis import TrekkerHistoryExportAPI, TrekkerHistoryExportStatusAPI, TrekkerHistoryExportDownloadAPI
 
 
 # api.add_resource(Index, '/')
@@ -112,7 +115,9 @@ api.add_resource(TrekkerCancelBookingAPI, '/trekker_dashboard/my_booking/<int:bo
 api.add_resource(TrekkerBookTrekAPI, '/trekker_dashboard/treks/<int:trek_id>/book')
 
 
-
+api.add_resource(TrekkerHistoryExportAPI, '/trekker_dashboard/history/export')
+api.add_resource(TrekkerHistoryExportStatusAPI, '/trekker_dashboard/history/export/<string:job_id>/status')
+api.add_resource(TrekkerHistoryExportDownloadAPI, '/trekker_dashboard/history/export/<string:job_id>/download')
 
 
 

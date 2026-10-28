@@ -93,14 +93,19 @@
 
                             <select v-model="selectedSchedules[trek.trek_id]" class="form-select mb-3">
                                 <option v-for="schedule in trek.schedules" :key="schedule.availability_id" :value="schedule.availability_id">
-                                    {{ schedule.start_date }} - {{ schedule.end_date }}
+                                    {{
+                                        schedule.start_date === schedule.end_date
+                                            ? $formatDate(schedule.start_date)
+                                            : `${$formatDate(schedule.start_date)} - ${$formatDate(schedule.end_date)}`
+                                    
+                                    }}
                                     ({{ schedule.avail_slot }} slots left)
                                 </option>
                             </select>
 
-                            <div v-if="getSelectedSchedule(trek)" class="small text-muted mb-3">
-                                <div>Total slots: {{ getSelectedSchedule(trek).total_slot }}</div>
-                                <div>Available: {{ getSelectedSchedule(trek).avail_slot }}</div>
+                            <div v-if="getSelectedSchedule(trek)" class="d-flex justify-content-center align-items-center gap-4 small text-muted mb-3">
+                                <span>Total slots: {{ getSelectedSchedule(trek).total_slot }}</span>
+                                <span>Available slots: {{ getSelectedSchedule(trek).avail_slot }}</span>
                             </div>
 
                             <button

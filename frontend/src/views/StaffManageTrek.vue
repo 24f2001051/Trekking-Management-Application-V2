@@ -44,9 +44,9 @@
                         <strong>Trek progress:</strong>
                         <span class="badge ms-2"
                             :class="{
-                                'bg-secondary': schedule.progress_status === 'Not Started',
+                                'bg-light': schedule.progress_status === 'Not Started',
                                 'bg-info': schedule.progress_status === 'Ongoing',
-                                'bg-success': schedule.progress_status === 'Completed'
+                                'bg-dark': schedule.progress_status === 'Completed'
                             }">
                             {{ schedule.progress_status }}
                         </span>

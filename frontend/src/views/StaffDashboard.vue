@@ -7,9 +7,9 @@
         <main class="flex-grow-1 p-4">
             <h1>STAFF DASHBOARD</h1>
             <br>
-            
+
             <!-- OR your dashboard cards -->
-        
+
         <div class="row g-3 mb-4">
 
             <div class="col-md-3">
@@ -60,20 +60,27 @@
         
                         <tbody>
                             <tr
-                                v-for="trek in dashboard.upcoming_treks"
+                                v-for="trek in dashboard.overall_treks"
                                 :key="trek.availability_id ?? 'Trek-${trek.trek_id}'"
                             >
                                 <td>{{ trek.trek_name }}</td>
-                                <td>{{ trek.dates }}</td>
+                                <td>
+                                    {{
+                                        trek.start_date === trek.end_date
+                                            ? $formatDate(trek.start_date)
+                                            : `${$formatDate(trek.start_date)} - ${$formatDate(trek.end_date)}`
+                                    }}
+
+                                </td>
                                 <td>{{ trek.participants }}</td>
                                 <td>{{ trek.avail_slot }}</td>
                                 <td>
                                     <span
                                         class="badge"
                                         :class="{
-                                            'bg-success': trek.status == 'Open',
-                                            'bg-danger': trek.status == 'Closed',
-                                            'bg-secondary': trek.status == 'Not Scheduled',
+                                            'text-bg-success': trek.status == 'Open',
+                                            'text-bg-danger': trek.status == 'Closed',
+                                            'text-bg-secondary': trek.status == 'Not Scheduled',
                                         }"
                                     >
                                         {{ trek.status }}</span>
@@ -88,7 +95,7 @@
                                     </button>
                                 </td>
                             </tr>
-                            <tr v-if="dashboard.upcoming_treks.length === 0">
+                            <tr v-if="dashboard.overall_treks.length === 0">
                                 <td colspan="6" class="text-center">No upcoming trek schedules available.</td>
                             </tr>
 
@@ -114,6 +121,7 @@ const fullname = localStorage.getItem('fullname') || 'Staff';
 const dashboard = ref({
     assigned_trek: null,
     total_participants: 0,
+    overall_treks: [],
     upcoming_treks: [],
     upcoming_treks_count: 0,
 })

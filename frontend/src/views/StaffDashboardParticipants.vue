@@ -50,12 +50,38 @@
                                     <td>
                                         <span
                                             class="badge"
-                                            :class="participant.booking_status === 'Cancelled'
-                                                ? 'bg-danger'
-                                                : 'bg-success'"
+                                            
+                                            :class="{
+                                                'text-bg-primary': participant.booking_status == 'Booked',
+                                                'text-bg-danger': participant.booking_status == 'Cancelled',
+                                                'text-bg-success': participant.booking_status == 'Completed',
+                                            }"
                                         >                                        
                                             {{ participant.booking_status }}
                                         </span>
+
+                                        <span
+                                            v-if="
+                                                participant.booking_status !== 'Cancelled' &&
+                                                !(participant.booking_status === 'Completed' &&
+                                                participant.progress_status === 'Completed')
+                                            "
+                                            class="badge ms-3"
+                                            :class="{
+                                                'text-bg-light': participant.progress_status == 'Not Started',
+                                                'text-bg-info': participant.progress_status == 'Ongoing',
+                                                'text-bg-dark': participant.progress_status == 'Completed',
+                                            }"
+                                        >
+                                            {{ participant.progress_status || 'N/A' }}
+                                        </span>
+                                        <span
+                                            v-else-if="participant.booking_status === 'Cancelled'"
+                                            class="text-muted"
+                                        >
+                                            -
+                                        </span>
+
                                     </td>
                                 </tr>
 

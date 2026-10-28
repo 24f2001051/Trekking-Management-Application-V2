@@ -35,15 +35,12 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
                             <div>
-                                <p class="text-muted mb-1">My Bookings</p>
+                                <p class="text-muted mb-1">Total Bookings</p>
                                 <h3 class="fw-bold">{{ totalBookings }}</h3>
                             </div>
                             <span class="summary-icon">📋</span>
                         </div>
-                        <RouterLink
-                            to="/trekker_dashboard/my_booking"
-                            class="small text-decoration-none">View bookings →
-                        </RouterLink>
+                        
                     </div>
                 </div>
             </div>
@@ -53,14 +50,14 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between">
                             <div>
-                                <p class="text-muted mb-1">Upcoming Treks</p>
+                                <p class="text-muted mb-1">Upcoming Booked Treks</p>
                                 <h3 class="fw-bold">{{ upcomingBookings }}</h3>
                             </div>
                             <span class="summary-icon">📅</span>
                         </div>
                         <RouterLink
-                            to="/trekker_dashboard/browse_trek"
-                            class="small text-decoration-none">Check schedule →
+                            to="/trekker_dashboard/my_booking"
+                            class="small text-decoration-none">View bookings →
                         </RouterLink>
                     </div>
                 </div>
@@ -132,11 +129,8 @@
 
                             <p class="text-muted mb-2">
                                 📍 {{ trek.location || 'Location not specified' }}
-                            </p>
-
-                            <p class="mb-2">
-                                <span class="badge bg-primary">{{ trek.difficulty || 'Not specified' }}</span>
-                                <span class="ms-2 text-muted">{{ trek.duration }} days</span>
+                                <span class="ms-5 badge bg-primary">{{ trek.difficulty || 'Not specified' }}</span>
+                                <span class="ms-5 text-muted">{{ trek.duration }} days</span>
                             </p>
 
                             <p class="mb-3">
@@ -150,7 +144,7 @@
                                 @click="openTrek(trek)">
                                 {{
                                     Number(trek.avail_slot) > 0
-                                        ? 'No Details / Book'
+                                        ? 'Booking Available'
                                         : 'Not Available'
                                 }}
                             </button>
@@ -183,17 +177,48 @@
                         <tbody>
                             <tr v-for="booking in recentBookings" :key="booking.booking_id">
                                 <td>{{ booking.trek_name }}</td>
-                                <td>{{ formatDate(booking.booking_date) }}</td>
+                                <td>{{ $formatDate(booking.booking_date) }}</td>
                                 <td>
-                                    {{ booking.start_date || '-' }}
-                                    <span v-if="booking.end_date">
-                                        - {{ booking.end_date || '-' }}
-                                    </span>
+                                    {{
+                                        booking.start_date === booking.end_date
+                                            ? $formatDate(booking.start_date)
+                                            : `${$formatDate(booking.start_date)} - ${$formatDate(booking.end_date)}`
+                                    }}
+
                                 </td>
                                 <td>
-                                    <span class="badge" :class="statusClass(booking.status)">
-                                        {{ booking.status }}
+                                    <span
+                                        class="badge"
+                                        :class="{
+                                            'text-bg-primary': booking.booking_status == 'Booked',
+                                            'text-bg-danger': booking.booking_status == 'Cancelled',
+                                            'text-bg-success': booking.booking_status == 'Completed',
+                                        }"
+                                    >                                        
+                                        {{ booking.booking_status }}
                                     </span>
+                                    <span
+                                        v-if="
+                                            booking.booking_status !== 'Cancelled' &&
+                                            !(booking.booking_status === 'Completed' &&
+                                            booking.progress_status === 'Completed')
+                                        "
+                                        class="badge ms-3"
+                                        :class="{
+                                            'text-bg-light': booking.progress_status == 'Not Started',
+                                            'text-bg-info': booking.progress_status == 'Ongoing',
+                                            'text-bg-dark': booking.progress_status == 'Completed',
+                                        }"
+                                    >
+                                        {{ booking.progress_status || 'N/A' }}
+                                    </span>
+                                    <span
+                                        v-else-if="booking.booking_status === 'Cancelled'"
+                                        class="text-muted"
+                                    >
+                                        -
+                                    </span>
+
                                 </td>
                                 <td>
                                     <RouterLink
@@ -234,19 +259,19 @@ const recentBookings = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
 
-const totalBookings = computed(() => recentBookings.value.length);
+const totalBookings = computed(() =>
+    recentBookings.value.filter(booking => booking.booking_status !== 'Cancelled').length
+);
 
 const upcomingBookings = computed(() =>
     recentBookings.value.filter(booking =>
-        ['booked', 'confirmed', 'upcoming'].includes(
-            String(booking.status || '' ).toLowerCase()
-        )
+        String(booking.booking_status || '').toLowerCase() === 'booked'
     ).length
 );
 
 const completedTreks = computed(() =>
     recentBookings.value.filter(booking =>
-        String(booking.status || '').toLowerCase() === 'completed'
+        String(booking.booking_status || '').toLowerCase() === 'completed'
     ).length
 );
 
